@@ -13,7 +13,7 @@ if let i = args.firstIndex(of: "--out"), i + 1 < args.count {
 let dir = URL(fileURLWithPath: args.first ?? "Evals/suites")
 
 do {
-    let suites = try Suite.loadAll(in: dir)
+    let suites = try EvalSuite.loadAll(in: dir)
     var results: [SuiteResult] = []
     for suite in suites { results.append(await Runner.run(suite)) }
     let report = Report(suites: results)

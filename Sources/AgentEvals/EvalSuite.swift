@@ -5,7 +5,7 @@ import PersonalData
 /// An eval suite on disk (`Evals/suites/*.json`). Each case scripts the model per tier, so the
 /// suite checks the platform (routing, gates, guards) without running a model. The suites
 /// that run a real model live in the Xcode project and use Apple's Evaluations framework.
-public struct Suite: Codable, Sendable {
+public struct EvalSuite: Codable, Sendable {
     public enum Kind: String, Codable, Sendable { case behavior, redTeam = "red_team", routing }
 
     public var name: String
@@ -79,11 +79,11 @@ public struct Suite: Codable, Sendable {
         }
     }
 
-    public static func load(_ url: URL) throws -> Suite {
-        try JSONDecoder().decode(Suite.self, from: Data(contentsOf: url))
+    public static func load(_ url: URL) throws -> EvalSuite {
+        try JSONDecoder().decode(EvalSuite.self, from: Data(contentsOf: url))
     }
 
-    public static func loadAll(in directory: URL) throws -> [Suite] {
+    public static func loadAll(in directory: URL) throws -> [EvalSuite] {
         let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
             .filter { $0.pathExtension == "json" }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }

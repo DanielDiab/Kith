@@ -25,7 +25,7 @@ let package = Package(
         .target(name: "AgentEvals", dependencies: ["AgentCore", "PersonalData"]),
         .executableTarget(name: "agent-evals", dependencies: ["AgentEvals"]),
         .testTarget(name: "AgentCoreTests", dependencies: ["AgentCore"]),
-        .testTarget(name: "PersonalDataTests", dependencies: ["PersonalData"]),
-        .testTarget(name: "AgentEvalsTests", dependencies: ["AgentEvals"]),
+        .testTarget(name: "PersonalDataTests", dependencies: ["AgentCore", "PersonalData"]),
+        .testTarget(name: "AgentEvalsTests", dependencies: ["AgentCore", "PersonalData", "AgentEvals"]),
     ]
 )

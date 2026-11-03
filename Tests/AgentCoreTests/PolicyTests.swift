@@ -41,7 +41,7 @@ struct PermissionTests {
     }
 
     @Test func pendingWritesExpireAndResolveOnce() async throws {
-        let clock = Clock(start: Date(timeIntervalSince1970: 1_000))
+        let clock = TestClock(start: Date(timeIntervalSince1970: 1_000))
         let store = PendingWriteStore(ttl: 60, now: { clock.now })
         let w = await store.hold(tool: "t", arguments: [:], summary: "s", client: .app, proposedAfterFlaggedData: false)
         #expect(await store.all().count == 1)
@@ -55,7 +55,7 @@ struct PermissionTests {
 }
 
 /// A settable clock for tests.
-final class Clock: @unchecked Sendable {
+final class TestClock: @unchecked Sendable {
     private let lock = NSLock()
     private var current: Date
     init(start: Date) { current = start }

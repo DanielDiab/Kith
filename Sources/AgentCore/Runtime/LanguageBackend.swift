@@ -74,7 +74,9 @@ public actor ScriptedBackend: LanguageBackend {
     }
 
     public init(tier: Tier = .onDevice, modelName: String = "scripted", steps: [Step]) {
-        self.init(tier: tier, modelName: modelName, attempts: [steps])
+        self.tier = tier
+        self.modelName = modelName
+        self.attempts = [steps]
     }
 
     public func respond(to request: ModelRequest, tools: ToolGate) async throws -> ModelReply {

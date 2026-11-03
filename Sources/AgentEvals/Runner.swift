@@ -18,7 +18,7 @@ public struct CaseResult: Codable, Sendable {
 
 public struct SuiteResult: Codable, Sendable {
     public var name: String
-    public var kind: Suite.Kind
+    public var kind: EvalSuite.Kind
     public var threshold: Double
     public var passed: Int
     public var total: Int
@@ -29,7 +29,7 @@ public struct SuiteResult: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey { case name, kind, threshold, passed, total, cases, passRate = "pass_rate", meetsThreshold = "meets_threshold" }
 
-    public init(name: String, kind: Suite.Kind, threshold: Double, cases: [CaseResult]) {
+    public init(name: String, kind: EvalSuite.Kind, threshold: Double, cases: [CaseResult]) {
         self.name = name
         self.kind = kind
         self.threshold = threshold
@@ -53,7 +53,7 @@ public struct SuiteResult: Codable, Sendable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
-            name: try c.decode(String.self, forKey: .name), kind: try c.decode(Suite.Kind.self, forKey: .kind),
+            name: try c.decode(String.self, forKey: .name), kind: try c.decode(EvalSuite.Kind.self, forKey: .kind),
             threshold: try c.decode(Double.self, forKey: .threshold), cases: try c.decode([CaseResult].self, forKey: .cases))
     }
 }
@@ -67,13 +67,13 @@ public enum Runner {
         TierProfile(tier: .claude, model: "claude-sonnet-5-5", contextTokens: 200_000),
     ]
 
-    public static func run(_ suite: Suite) async -> SuiteResult {
+    public static func run(_ suite: EvalSuite) async -> SuiteResult {
         var results: [CaseResult] = []
         for c in suite.cases { results.append(await run(c)) }
         return SuiteResult(name: suite.name, kind: suite.kind, threshold: suite.threshold, cases: results)
     }
 
-    public static func run(_ c: Suite.Case) async -> CaseResult {
+    public static func run(_ c: EvalSuite.Case) async -> CaseResult {
         let store = SyntheticData.store()
         let format = LocalFormat(timeZone: SyntheticData.timeZone)
         await plant(c.fixtures, in: store, format: format)
@@ -109,7 +109,7 @@ public enum Runner {
             costUSD: turn.trace.costUSD, referenceCostUSD: turn.trace.referenceCostUSD, tokens: turn.trace.usage.total)
     }
 
-    static func check(_ e: Suite.Expectation, turn: AgentTurn, executed: Int) -> [String] {
+    static func check(_ e: EvalSuite.Expectation, turn: AgentTurn, executed: Int) -> [String] {
         var f: [String] = []
         if let o = e.outcome, o != turn.outcome { f.append("outcome \(turn.outcome.rawValue), expected \(o.rawValue)") }
         if let t = e.tier, t != turn.tier { f.append("tier \(turn.tier?.rawValue ?? "none"), expected \(t.rawValue)") }
@@ -126,7 +126,7 @@ public enum Runner {
         return f
     }
 
-    static func plant(_ fixtures: Suite.Fixtures?, in store: InMemoryStore, format: LocalFormat) async {
+    static func plant(_ fixtures: EvalSuite.Fixtures?, in store: InMemoryStore, format: LocalFormat) async {
         guard let fixtures else { return }
         for e in fixtures.events ?? [] {
             guard let s = format.parse(e.start), let end = format.parse(e.end) else { continue }
