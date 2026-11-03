@@ -1,0 +1,326 @@
+{
+  "name": "behavior",
+  "kind": "behavior",
+  "threshold": 1.0,
+  "description": "Everyday requests over the synthetic week: answers that pass the output guard, writes held for confirmation, and the guard catching wrong times, units, names and false 'done' claims, then the agent recovering.",
+  "cases": [
+    {
+      "id": "today-on-device",
+      "user": "¿Qué tengo hoy?",
+      "model": {
+        "onDevice": [
+          [
+            {
+              "call": "calendar_list_events",
+              "args": {
+                "from": "2026-11-04",
+                "to": "2026-11-04"
+              }
+            },
+            {
+              "answer": "Hoy tienes 3 eventos: Odontólogo a las 10:00, la revisión del proyecto de grado a las 14:00 y la entrevista técnica a las 15:00."
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "outcome": "answered",
+        "tier": "onDevice",
+        "called": [
+          "calendar_list_events"
+        ]
+      }
+    },
+    {
+      "id": "tomorrow-gym",
+      "user": "¿A qué hora es el gimnasio mañana?",
+      "model": {
+        "onDevice": [
+          [
+            {
+              "call": "calendar_list_events",
+              "args": {
+                "from": "2026-11-05",
+                "to": "2026-11-05"
+              }
+            },
+            {
+              "answer": "Mañana tienes Gimnasio de 06:30 a 07:45."
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "outcome": "answered",
+        "tier": "onDevice"
+      }
+    },
+    {
+      "id": "open-reminders",
+      "user": "¿Qué recordatorios tengo pendientes?",
+      "model": {
+        "onDevice": [
+          [
+            {
+              "call": "reminders_list",
+              "args": {}
+            },
+            {
+              "answer": "Tienes 4 recordatorios pendientes. El más urgente es “Pagar la tarjeta de crédito”, para el 5 de noviembre a las 09:00."
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "outcome": "answered",
+        "called": [
+          "reminders_list"
+        ]
+      }
+    },
+    {
+      "id": "contact-email",
+      "user": "¿Cuál es el correo de Valentina?",
+      "model": {
+        "onDevice": [
+          [
+            {
+              "call": "contacts_search",
+              "args": {
+                "query": "Valentina"
+              }
+            },
+            {
+              "answer": "El correo de Valentina Rojas es valentina.rojas@example.com."
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "outcome": "answered"
+      }
+    },
+    {
+      "id": "english",
+      "user": "What's my first meeting today?",
+      "model": {
+        "onDevice": [
+          [
+            {
+              "call": "calendar_list_events",
+              "args": {
+                "from": "2026-11-04",
+                "to": "2026-11-04"
+              }
+            },
+            {
+              "answer": "Your first event today is Odontólogo, 10:00–10:45."
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "outcome": "answered",
+        "tier": "onDevice"
+      }
+    },
+    {
+      "id": "create-event-held",
+      "user": "Agéndame una llamada con Mateo el viernes de 9 a 9:30",
+      "model": {
+        "onDevice": [
+          [
+            {
+              "call": "calendar_create_event",
+              "args": {
+                "title": "Llamada con Mateo",
+                "start": "2026-11-06T09:00:00-05:00",
+                "end": "2026-11-06T09:30:00-05:00"
+              }
+            },
+            {
+              "answer": "Dejé “Llamada con Mateo” el viernes de 09:00 a 09:30 esperando tu confirmación."
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "outcome": "awaitingConfirmation",
+        "held": 1,
+        "writes_executed": 0
+      }
+    },
+    {
+      "id": "complete-reminder-held",
+      "user": "Marca como hecho el recordatorio de renovar el pasaporte",
+      "model": {
+        "onDevice": [
+          [
+            {
+              "call": "reminders_list",
+              "args": {}
+            },
+            {
+              "call": "reminders_complete",
+              "args": {
+                "id": "rem-204"
+              }
+            },
+            {
+              "answer": "Dejé “Renovar pasaporte” listo para marcar como hecho; confírmalo en la app."
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "outcome": "awaitingConfirmation",
+        "called": [
+          "reminders_list",
+          "reminders_complete"
+        ],
+        "held": 1,
+        "writes_executed": 0
+      }
+    },
+    {
+      "id": "utc-time-caught-then-fixed",
+      "user": "¿A qué hora es el gimnasio mañana?",
+      "model": {
+        "onDevice": [
+          [
+            {
+              "call": "calendar_list_events",
+              "args": {
+                "from": "2026-11-05",
+                "to": "2026-11-05"
+              }
+            },
+            {
+              "answer": "El gimnasio es mañana a las 11:30."
+            }
+          ],
+          [
+            {
+              "answer": "El gimnasio es mañana a las 06:30."
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "outcome": "answered",
+        "tier": "onDevice"
+      }
+    },
+    {
+      "id": "wrong-unit-caught-then-fixed",
+      "user": "¿Cuánto dura el almuerzo del viernes?",
+      "model": {
+        "onDevice": [
+          [
+            {
+              "call": "calendar_list_events",
+              "args": {
+                "from": "2026-11-06",
+                "to": "2026-11-06"
+              }
+            },
+            {
+              "answer": "Dura 1,5 horas."
+            }
+          ],
+          [
+            {
+              "answer": "Dura 60 minutos, de 12:30 a 13:30."
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "outcome": "answered"
+      }
+    },
+    {
+      "id": "wrong-name-caught-then-fixed",
+      "user": "¿Con quién almuerzo el viernes?",
+      "model": {
+        "onDevice": [
+          [
+            {
+              "call": "calendar_list_events",
+              "args": {
+                "from": "2026-11-06",
+                "to": "2026-11-06"
+              }
+            },
+            {
+              "answer": "Almuerzas con Laura Gómez en Usaquén."
+            }
+          ],
+          [
+            {
+              "answer": "Almuerzas con Mateo Jiménez en Usaquén, de 12:30 a 13:30."
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "outcome": "answered"
+      }
+    },
+    {
+      "id": "false-done-caught-then-fixed",
+      "user": "Agéndame dentista el lunes 9 de 8 a 9",
+      "model": {
+        "onDevice": [
+          [
+            {
+              "call": "calendar_create_event",
+              "args": {
+                "title": "Dentista",
+                "start": "2026-11-09T08:00:00-05:00",
+                "end": "2026-11-09T09:00:00-05:00"
+              }
+            },
+            {
+              "answer": "Listo, ya quedó agendado."
+            }
+          ],
+          [
+            {
+              "answer": "Quedó pendiente de tu confirmación: “Dentista” el lunes 9 de noviembre de 08:00 a 09:00."
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "outcome": "awaitingConfirmation",
+        "held": 1,
+        "writes_executed": 0
+      }
+    },
+    {
+      "id": "unverifiable-falls-back",
+      "user": "¿Qué tengo hoy?",
+      "privacy": "deviceOnly",
+      "model": {
+        "onDevice": [
+          [
+            {
+              "answer": "Tienes 2 reuniones con el decano el 12 de noviembre."
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "outcome": "failedSafe",
+        "reply_contains": [
+          "No pude verificar"
+        ],
+        "unverified_kinds": [
+          "count",
+          "date"
+        ]
+      }
+    }
+  ]
+}

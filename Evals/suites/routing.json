@@ -1,0 +1,230 @@
+{
+  "name": "routing",
+  "kind": "routing",
+  "threshold": 1.0,
+  "description": "The router picks the tier in code: on-device for simple requests, the Mac's open model for multi-step ones, Claude only when privacy allows and nothing local fits, and escalation when an answer can't be verified.",
+  "cases": [
+    {
+      "id": "simple-stays-on-device",
+      "user": "¿Qué tengo mañana?",
+      "model": {
+        "onDevice": [
+          [
+            {
+              "call": "calendar_list_events",
+              "args": {
+                "from": "2026-11-05",
+                "to": "2026-11-05"
+              }
+            },
+            {
+              "answer": "Mañana tienes Gimnasio de 06:30 a 07:45."
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "tier": "onDevice",
+        "outcome": "answered"
+      }
+    },
+    {
+      "id": "multi-step-goes-to-mac",
+      "user": "Organiza mi semana y dime si hay conflictos",
+      "privacy": "ownHardware",
+      "model": {
+        "localOpen": [
+          [
+            {
+              "call": "calendar_list_events",
+              "args": {
+                "from": "2026-11-02",
+                "to": "2026-11-08"
+              }
+            },
+            {
+              "answer": "El miércoles 4 de noviembre se cruzan la revisión del proyecto de grado (14:00–15:30) y la entrevista técnica (15:00–16:00)."
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "tier": "localOpen",
+        "outcome": "answered"
+      }
+    },
+    {
+      "id": "cloud-only-when-allowed",
+      "user": "Organiza mi semana y dime si hay conflictos",
+      "privacy": "allowCloud",
+      "unavailable": [
+        "localOpen"
+      ],
+      "model": {
+        "claude": [
+          [
+            {
+              "call": "calendar_list_events",
+              "args": {
+                "from": "2026-11-02",
+                "to": "2026-11-08"
+              }
+            },
+            {
+              "answer": "El miércoles 4 de noviembre se cruzan la revisión del proyecto de grado (14:00–15:30) y la entrevista técnica (15:00–16:00)."
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "tier": "claude",
+        "outcome": "answered"
+      }
+    },
+    {
+      "id": "own-hardware-never-calls-cloud",
+      "user": "Organiza mi semana y dime si hay conflictos",
+      "privacy": "ownHardware",
+      "unavailable": [
+        "localOpen"
+      ],
+      "model": {
+        "onDevice": [
+          [
+            {
+              "call": "calendar_list_events",
+              "args": {
+                "from": "2026-11-02",
+                "to": "2026-11-08"
+              }
+            },
+            {
+              "answer": "El miércoles 4 de noviembre se cruzan la revisión del proyecto de grado (14:00–15:30) y la entrevista técnica (15:00–16:00)."
+            }
+          ]
+        ],
+        "claude": [
+          [
+            {
+              "answer": "should never run"
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "tier": "onDevice",
+        "outcome": "answered"
+      }
+    },
+    {
+      "id": "device-only-stays-on-device",
+      "user": "Compara mi semana con la anterior",
+      "privacy": "deviceOnly",
+      "model": {
+        "onDevice": [
+          [
+            {
+              "call": "calendar_list_events",
+              "args": {
+                "from": "2026-11-02",
+                "to": "2026-11-08"
+              }
+            },
+            {
+              "answer": "Esta semana tienes 8 eventos."
+            }
+          ]
+        ],
+        "localOpen": [
+          [
+            {
+              "answer": "should never run"
+            }
+          ]
+        ],
+        "claude": [
+          [
+            {
+              "answer": "should never run"
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "tier": "onDevice",
+        "outcome": "answered"
+      }
+    },
+    {
+      "id": "on-device-unavailable",
+      "user": "¿Qué tengo mañana?",
+      "unavailable": [
+        "onDevice"
+      ],
+      "model": {
+        "localOpen": [
+          [
+            {
+              "call": "calendar_list_events",
+              "args": {
+                "from": "2026-11-05",
+                "to": "2026-11-05"
+              }
+            },
+            {
+              "answer": "Mañana tienes Gimnasio de 06:30 a 07:45."
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "tier": "localOpen",
+        "outcome": "answered"
+      }
+    },
+    {
+      "id": "escalates-after-failed-check",
+      "user": "¿A qué hora es el gimnasio mañana?",
+      "privacy": "ownHardware",
+      "model": {
+        "onDevice": [
+          [
+            {
+              "call": "calendar_list_events",
+              "args": {
+                "from": "2026-11-05",
+                "to": "2026-11-05"
+              }
+            },
+            {
+              "answer": "El gimnasio es a las 11:30."
+            }
+          ],
+          [
+            {
+              "answer": "El gimnasio es a las 11:30."
+            }
+          ]
+        ],
+        "localOpen": [
+          [
+            {
+              "call": "calendar_list_events",
+              "args": {
+                "from": "2026-11-05",
+                "to": "2026-11-05"
+              }
+            },
+            {
+              "answer": "El gimnasio es mañana a las 06:30."
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "tier": "localOpen",
+        "outcome": "answered"
+      }
+    }
+  ]
+}
