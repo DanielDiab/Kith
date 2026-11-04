@@ -126,11 +126,15 @@ actor KithRuntime {
         await ensureConfigured()
         if let agent { return agent }
         let names = (try? await store.allContactNames()) ?? []
-        let demo = settings.dataSource == .demo
+        // The demo week is frozen at Wednesday 4 Nov 2026, 08:00, so "today" means the same thing in every demo.
+        let fixed = SyntheticData.now
+        let clock: @Sendable () -> Date
+        if settings.dataSource == .demo { clock = { fixed } } else { clock = { Date() } }
+        let config = AgentConfig(timeZone: timeZone, privacy: settings.privacy)
+        let router = Router(profiles: profiles)
         let built = Agent(
-            config: AgentConfig(timeZone: timeZone, privacy: settings.privacy),
-            router: Router(profiles: profiles), backends: backends(), registry: registry, policy: policy(),
-            pending: pending, knownNames: names, now: demo ? { SyntheticData.now } : { Date() })
+            config: config, router: router, backends: backends(), registry: registry, policy: policy(),
+            pending: pending, knownNames: names, now: clock)
         agent = built
         return built
     }

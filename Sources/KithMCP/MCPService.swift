@@ -73,7 +73,7 @@ public struct MCPService: Sendable {
             userText: "\(name) \(masker.mask(args).jsonString())", startedAt: started, spans: await recorder.all())
         await log.append(trace)
         let isError = result["error"] != nil || result["status"]?.stringValue == "refused"
-        return CallTool.Result(content: [.text(result.jsonString(pretty: true))], isError: isError)
+        return CallTool.Result(content: [.text(text: result.jsonString(pretty: true), annotations: nil, _meta: nil)], isError: isError)
     }
 
     /// Starts an MCP server for one connection and returns it once it's running.
