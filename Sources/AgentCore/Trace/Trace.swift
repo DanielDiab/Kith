@@ -33,6 +33,14 @@ public struct Trace: Codable, Sendable, Equatable {
     public var startedAt: Date
     public var spans: [Span]
 
+    public init(id: String, client: Client, userText: String, startedAt: Date, spans: [Span]) {
+        self.id = id
+        self.client = client
+        self.userText = userText
+        self.startedAt = startedAt
+        self.spans = spans
+    }
+
     public var tier: Tier? { spans.last(where: { $0.kind == .model })?.tier }
     public var usage: TokenUsage { spans.compactMap(\.usage).reduce(.zero, +) }
     public var costUSD: Double { spans.reduce(0) { $0 + $1.costUSD } }

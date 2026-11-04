@@ -58,7 +58,7 @@ public struct MCPService: Sendable {
         }
     }
 
-    public func call(_ name: String, arguments: [String: Value]?, client: AgentCore.Client) async -> CallTool.Result {
+    public func call(_ name: String, arguments: [String: MCP.Value]?, client: AgentCore.Client) async -> CallTool.Result {
         let recorder = TraceRecorder(masker: masker, prices: prices)
         let gate = ToolGate(
             registry: registry, policy: await policy(), client: client, pending: pending, recorder: recorder,

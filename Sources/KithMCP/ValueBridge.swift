@@ -4,7 +4,7 @@ import MCP
 
 extension JSONValue {
     /// Converts an MCP SDK value into the agent's JSON value.
-    public init(mcp value: Value) {
+    public init(mcp value: MCP.Value) {
         switch value {
         case .null: self = .null
         case .bool(let b): self = .bool(b)
@@ -18,11 +18,11 @@ extension JSONValue {
     }
 
     /// Converts the agent's JSON value into an MCP SDK value.
-    public var mcpValue: Value {
+    public var mcpValue: MCP.Value {
         switch self {
-        case .null: return .null
+        case .null: return MCP.Value.null
         case .bool(let b): return .bool(b)
-        case .number(let n): return n.rounded() == n && abs(n) < 1e15 ? .int(Int(n)) : .double(n)
+        case .number(let n): return n.rounded() == n && abs(n) < 1e15 ? MCP.Value.int(Int(n)) : MCP.Value.double(n)
         case .string(let s): return .string(s)
         case .array(let a): return .array(a.map(\.mcpValue))
         case .object(let o): return .object(o.mapValues(\.mcpValue))

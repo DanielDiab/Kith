@@ -121,10 +121,12 @@
 
         // MARK: Contacts
 
-        static let keys: [CNKeyDescriptor] = [
+        static var keys: [CNKeyDescriptor] {
+            [
             CNContactIdentifierKey, CNContactGivenNameKey, CNContactFamilyNameKey, CNContactEmailAddressesKey,
             CNContactPhoneNumbersKey, CNContactOrganizationNameKey,
-        ] as [CNKeyDescriptor]
+            ] as [CNKeyDescriptor]
+        }
 
         public func searchContacts(_ query: String) async throws -> [Contact] {
             guard CNContactStore.authorizationStatus(for: .contacts) == .authorized else {
