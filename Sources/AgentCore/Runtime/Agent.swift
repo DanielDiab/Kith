@@ -116,8 +116,7 @@ public actor Agent {
             masker: masker, userText: userText)
         let tools = gate.visibleSpecs()
         let instructions = Self.instructions(now: now(), timeZone: config.timeZone)
-        let promptTokens = (instructions.count + userText.count + history.reduce(0) { $0 + $1.content.count }
-            + tools.reduce(0) { $0 + $1.inputSchema.jsonString().count + $1.description.count }) / 4
+        let promptTokens = Self.estimateTokens(instructions: instructions, userText: userText, history: history, tools: tools)
 
         t = await recorder.time()
         guard var decision = routeToBackend(promptTokens: promptTokens, userText: userText, above: nil) else {
@@ -216,6 +215,14 @@ public actor Agent {
         await recorder.record(.route, next.tier.rawValue, status: .escalated, startedAt: t, tier: next.tier, model: next.model,
                               detail: ["from": current.tier.rawValue, "reason": next.reason])
         return next
+    }
+
+    /// About four characters per token, over everything the model will read before answering.
+    static func estimateTokens(instructions: String, userText: String, history: [ChatMessage], tools: [ToolSpec]) -> Int {
+        var characters = instructions.count + userText.count
+        for message in history { characters += message.content.count }
+        for tool in tools { characters += tool.description.count + tool.inputSchema.jsonString().count }
+        return characters / 4
     }
 
     static func routeDetail(_ d: RouteDecision) -> [String: String] {
