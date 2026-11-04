@@ -13,7 +13,7 @@ final class StubHTTP: HTTPClient, @unchecked Sendable {
     private let lock = NSLock()
     private var replies: [(String, Int)]
     private(set) var bodies: [JSONValue] = []
-    private(set) var headers: [[String: String]] = []
+    private(set) var apiKeys: [String?] = []
 
     init(_ replies: [(String, Int)]) { self.replies = replies }
 
@@ -27,7 +27,7 @@ final class StubHTTP: HTTPClient, @unchecked Sendable {
         if let body = request.httpBody, let json = try? JSONValue.parse(String(decoding: body, as: UTF8.self)) {
             bodies.append(json)
         }
-        headers.append(request.allHTTPHeaderFields ?? [:])
+        apiKeys.append(request.value(forHTTPHeaderField: "x-api-key"))
         let (text, status) = replies.isEmpty ? ("{}", 500) : replies.removeFirst()
         return (Data(text.utf8), status)
     }
@@ -106,7 +106,7 @@ struct AnthropicTests {
         #expect(reply.text == "Tienes Odontólogo a las 10:00.")
         #expect(reply.usage.input == 1_550)
         #expect(reply.usage.cachedInput == 400)
-        #expect(stub.headers.first?["x-api-key"] == "test-key")
+        #expect(stub.apiKeys.first == "test-key")
         let last = try #require(stub.bodies.last?["messages"]?.arrayValue?.last)
         #expect(last["content"]?.arrayValue?.first?["type"]?.stringValue == "tool_result")
         #expect(stub.bodies.first?["system"]?.stringValue == "rules")
