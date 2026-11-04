@@ -1,3 +1,4 @@
+import AgentCore
 import Foundation
 
 /// A fixed, synthetic week for tests, evals and the demo. No real person's data: every name

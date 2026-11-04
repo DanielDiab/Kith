@@ -1,3 +1,4 @@
+import AgentCore
 import Foundation
 
 /// Human-readable local dates for tool results ("mié 4 nov 2026, 10:00").
