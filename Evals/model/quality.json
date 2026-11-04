@@ -1,0 +1,135 @@
+{
+  "name": "model_quality",
+  "kind": "quality",
+  "threshold": 0.8,
+  "description": "Real model, synthetic week. The answer must pass the output guard and contain the key fact. Run from the KithModelEvals test target on a Mac with Apple Intelligence; the Mac's open model is used when Ollama is running.",
+  "cases": [
+    {
+      "id": "today",
+      "user": "¿Qué tengo hoy?",
+      "expect": {
+        "outcome_in": [
+          "answered"
+        ],
+        "calls_include": [
+          "calendar_list_events"
+        ],
+        "reply_contains": [
+          "10:00"
+        ]
+      }
+    },
+    {
+      "id": "gym-tomorrow",
+      "user": "¿A qué hora es el gimnasio mañana?",
+      "expect": {
+        "outcome_in": [
+          "answered"
+        ],
+        "reply_contains": [
+          "6:30"
+        ]
+      }
+    },
+    {
+      "id": "lunch-with",
+      "user": "¿Con quién almuerzo el viernes?",
+      "expect": {
+        "outcome_in": [
+          "answered"
+        ],
+        "reply_contains": [
+          "Mateo"
+        ]
+      }
+    },
+    {
+      "id": "contact-email",
+      "user": "¿Cuál es el correo de Valentina?",
+      "expect": {
+        "outcome_in": [
+          "answered"
+        ],
+        "calls_include": [
+          "contacts_search"
+        ],
+        "reply_contains": [
+          "valentina.rojas@example.com"
+        ]
+      }
+    },
+    {
+      "id": "first-due",
+      "user": "¿Qué recordatorio vence primero?",
+      "expect": {
+        "outcome_in": [
+          "answered"
+        ],
+        "calls_include": [
+          "reminders_list"
+        ],
+        "reply_contains": [
+          "tarjeta"
+        ]
+      }
+    },
+    {
+      "id": "dentist-length",
+      "user": "¿Cuánto dura la cita del odontólogo?",
+      "expect": {
+        "outcome_in": [
+          "answered"
+        ],
+        "reply_contains": [
+          "45"
+        ]
+      }
+    },
+    {
+      "id": "week-conflicts",
+      "user": "Organiza mi semana y dime si hay conflictos",
+      "expect": {
+        "outcome_in": [
+          "answered"
+        ],
+        "reply_contains": [
+          "ntrevista"
+        ]
+      }
+    },
+    {
+      "id": "english",
+      "user": "What's my first meeting today?",
+      "expect": {
+        "outcome_in": [
+          "answered"
+        ],
+        "reply_contains": [
+          "Odont"
+        ]
+      }
+    },
+    {
+      "id": "create-held",
+      "user": "Agéndame gimnasio el viernes de 7 a 8",
+      "expect": {
+        "outcome_in": [
+          "awaitingConfirmation"
+        ],
+        "held": 1,
+        "writes_executed": 0
+      }
+    },
+    {
+      "id": "complete-held",
+      "user": "Marca como hecho el recordatorio de renovar el pasaporte",
+      "expect": {
+        "outcome_in": [
+          "awaitingConfirmation"
+        ],
+        "held": 1,
+        "writes_executed": 0
+      }
+    }
+  ]
+}

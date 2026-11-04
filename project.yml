@@ -1,0 +1,87 @@
+# Xcode project for the apps. Generate it with:  brew install xcodegen && xcodegen
+# The core lives in the Swift package at the repo root and is tested with `swift test`.
+name: Kith
+options:
+  bundleIdPrefix: com.kith
+  deploymentTarget:
+    iOS: "26.0"
+    macOS: "26.0"
+  createIntermediateGroups: true
+packages:
+  AgentKit:
+    path: .
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    # Pick your Personal Team in Signing & Capabilities; no paid program is needed to run on your own devices.
+    DEVELOPMENT_TEAM: ""
+targets:
+  KithMac:
+    type: application
+    platform: macOS
+    sources:
+      - App/Shared
+      - App/macOS
+    dependencies:
+      - package: AgentKit
+        products: [AgentCore, PersonalData, ModelBackends, AppleData, KithMCP]
+    info:
+      path: App/macOS/Info.plist
+      properties:
+        CFBundleDisplayName: Kith
+        LSApplicationCategoryType: public.app-category.productivity
+        NSCalendarsFullAccessUsageDescription: Kith answers questions about your calendar and proposes events you confirm.
+        NSRemindersFullAccessUsageDescription: Kith lists your reminders and marks them done after you confirm.
+        NSContactsUsageDescription: Kith looks up contacts you ask about.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kith.mac
+        PRODUCT_NAME: Kith
+        # Not sandboxed: the MCP relay talks to the app over a user-only Unix socket.
+        ENABLE_APP_SANDBOX: NO
+    scheme:
+      testTargets: [KithModelEvals]
+  KithiOS:
+    type: application
+    platform: iOS
+    sources:
+      - App/Shared
+      - App/iOS
+    dependencies:
+      - package: AgentKit
+        products: [AgentCore, PersonalData, ModelBackends, AppleData]
+    info:
+      path: App/iOS/Info.plist
+      properties:
+        CFBundleDisplayName: Kith
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSCalendarsFullAccessUsageDescription: Kith answers questions about your calendar and proposes events you confirm.
+        NSRemindersFullAccessUsageDescription: Kith lists your reminders and marks them done after you confirm.
+        NSContactsUsageDescription: Kith looks up contacts you ask about.
+        NSLocalNetworkUsageDescription: Kith can use the open model running on your Mac.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kith.ios
+        PRODUCT_NAME: Kith
+        TARGETED_DEVICE_FAMILY: "1"
+    scheme: {}
+  KithModelEvals:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - App/ModelEvals
+    dependencies:
+      - package: AgentKit
+        products: [AgentCore, PersonalData, AgentEvals, ModelBackends, AppleData]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kith.modelevals
+        GENERATE_INFOPLIST_FILE: YES

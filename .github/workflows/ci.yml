@@ -43,3 +43,17 @@ jobs:
         run: swift build --build-tests
       - name: Test package on macOS
         run: swift test
+      - name: Generate the Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Build the macOS app
+        run: |
+          xcodebuild -project Kith.xcodeproj -scheme KithMac -destination 'generic/platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO build-for-testing | tail -40
+          test ${PIPESTATUS[0]} -eq 0
+      - name: Build the iOS app
+        run: |
+          xcodebuild -project Kith.xcodeproj -scheme KithiOS -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO build | tail -40
+          test ${PIPESTATUS[0]} -eq 0

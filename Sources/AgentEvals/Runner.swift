@@ -58,8 +58,22 @@ public struct SuiteResult: Codable, Sendable {
     }
 }
 
-/// Runs suites against the real runtime, tools and guards, with scripted models and the
-/// synthetic week as data.
+/// Real models for the suites that measure model behavior (`Evals/model`). The Xcode test
+/// target builds this with the on-device model and, if it's running, the Mac's open model.
+public struct LiveModels: Sendable {
+    public var backends: [any LanguageBackend]
+    public var profiles: [TierProfile]
+    public var privacy: PrivacyMode
+
+    public init(backends: [any LanguageBackend], profiles: [TierProfile], privacy: PrivacyMode = .ownHardware) {
+        self.backends = backends
+        self.profiles = profiles
+        self.privacy = privacy
+    }
+}
+
+/// Runs suites against the real runtime, tools and guards, with the synthetic week as data and
+/// either scripted models (CI) or real ones (`live`).
 public enum Runner {
     public static let profiles = [
         TierProfile(tier: .onDevice, model: "apple-on-device", contextTokens: 4_096),
@@ -67,20 +81,20 @@ public enum Runner {
         TierProfile(tier: .claude, model: "claude-sonnet-5-5", contextTokens: 200_000),
     ]
 
-    public static func run(_ suite: EvalSuite) async -> SuiteResult {
+    public static func run(_ suite: EvalSuite, live: LiveModels? = nil) async -> SuiteResult {
         var results: [CaseResult] = []
-        for c in suite.cases { results.append(await run(c)) }
+        for c in suite.cases { results.append(await run(c, live: live)) }
         return SuiteResult(name: suite.name, kind: suite.kind, threshold: suite.threshold, cases: results)
     }
 
-    public static func run(_ c: EvalSuite.Case) async -> CaseResult {
+    public static func run(_ c: EvalSuite.Case, live: LiveModels? = nil) async -> CaseResult {
         let store = SyntheticData.store()
         let format = LocalFormat(timeZone: SyntheticData.timeZone)
         await plant(c.fixtures, in: store, format: format)
 
         let registry = ToolRegistry(PersonalTools.all(store: store, format: format))
         let unavailable = Set(c.unavailable ?? [])
-        let router = Router(profiles: profiles.map { p in
+        let router = Router(profiles: (live?.profiles ?? profiles).map { p in
             var p = p
             if unavailable.contains(p.tier) {
                 p.available = false
@@ -88,15 +102,17 @@ public enum Runner {
             }
             return p
         })
-        var backends: [any LanguageBackend] = []
-        for profile in profiles {
-            if let attempts = c.model[profile.tier.rawValue] {
-                backends.append(ScriptedBackend(tier: profile.tier, modelName: profile.model, attempts: attempts))
+        var backends: [any LanguageBackend] = live?.backends ?? []
+        if live == nil {
+            for profile in profiles {
+                if let attempts = c.model?[profile.tier.rawValue] {
+                    backends.append(ScriptedBackend(tier: profile.tier, modelName: profile.model, attempts: attempts))
+                }
             }
         }
         let names = (try? await store.allContactNames()) ?? []
         let agent = Agent(
-            config: AgentConfig(timeZone: SyntheticData.timeZone, privacy: c.privacy ?? .allowCloud),
+            config: AgentConfig(timeZone: SyntheticData.timeZone, privacy: c.privacy ?? live?.privacy ?? .allowCloud),
             router: router, backends: backends, registry: registry, policy: .allowAll(registry.specs),
             pending: PendingWriteStore(now: { SyntheticData.now }), knownNames: names, now: { SyntheticData.now })
 
@@ -112,6 +128,10 @@ public enum Runner {
     static func check(_ e: EvalSuite.Expectation, turn: AgentTurn, executed: Int) -> [String] {
         var f: [String] = []
         if let o = e.outcome, o != turn.outcome { f.append("outcome \(turn.outcome.rawValue), expected \(o.rawValue)") }
+        if let any = e.outcomeIn, !any.contains(turn.outcome) {
+            f.append("outcome \(turn.outcome.rawValue), expected one of \(any.map(\.rawValue))")
+        }
+        for tool in e.callsInclude ?? [] where !turn.calledTools.contains(tool) { f.append("never called \(tool)") }
         if let t = e.tier, t != turn.tier { f.append("tier \(turn.tier?.rawValue ?? "none"), expected \(t.rawValue)") }
         if let called = e.called, called != turn.calledTools { f.append("called \(turn.calledTools), expected \(called)") }
         if let denied = e.denied, denied != turn.deniedTools { f.append("denied \(turn.deniedTools), expected \(denied)") }

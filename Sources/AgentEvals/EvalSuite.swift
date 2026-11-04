@@ -6,7 +6,7 @@ import PersonalData
 /// suite checks the platform (routing, gates, guards) without running a model. The suites
 /// that run a real model live in the Xcode project and use Apple's Evaluations framework.
 public struct EvalSuite: Codable, Sendable {
-    public enum Kind: String, Codable, Sendable { case behavior, redTeam = "red_team", routing }
+    public enum Kind: String, Codable, Sendable { case behavior, redTeam = "red_team", routing, quality }
 
     public var name: String
     public var description: String
@@ -24,8 +24,8 @@ public struct EvalSuite: Codable, Sendable {
         public var fixtures: Fixtures?
         /// Tiers whose backend is reported unavailable ("Apple Intelligence is off").
         public var unavailable: [Tier]?
-        /// Script per tier: each inner list is one attempt.
-        public var model: [String: [[ScriptedBackend.Step]]]
+        /// Script per tier: each inner list is one attempt. Empty in suites that run a real model.
+        public var model: [String: [[ScriptedBackend.Step]]]?
         public var expect: Expectation
     }
 
@@ -60,6 +60,10 @@ public struct EvalSuite: Codable, Sendable {
 
     public struct Expectation: Codable, Sendable {
         public var outcome: AgentTurn.Outcome?
+        /// For real models: any of these outcomes passes.
+        public var outcomeIn: [AgentTurn.Outcome]?
+        /// For real models: these tools must be among the calls (order and extras don't matter).
+        public var callsInclude: [String]?
         public var tier: Tier?
         public var called: [String]?
         public var denied: [String]?
@@ -72,6 +76,8 @@ public struct EvalSuite: Codable, Sendable {
 
         enum CodingKeys: String, CodingKey {
             case outcome, tier, called, denied, held
+            case outcomeIn = "outcome_in"
+            case callsInclude = "calls_include"
             case writesExecuted = "writes_executed"
             case flaggedData = "flagged_data"
             case replyContains = "reply_contains"
