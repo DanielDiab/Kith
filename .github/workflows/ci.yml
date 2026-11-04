@@ -49,11 +49,19 @@ jobs:
           xcodegen generate
       - name: Build the macOS app
         run: |
+          set +e
           xcodebuild -project Kith.xcodeproj -scheme KithMac -destination 'generic/platform=macOS' \
-            CODE_SIGNING_ALLOWED=NO build-for-testing | tail -40
-          test ${PIPESTATUS[0]} -eq 0
+            CODE_SIGNING_ALLOWED=NO build-for-testing > mac.log 2>&1
+          status=$?
+          grep -E ": (error|warning): " mac.log | grep -v "/SourcePackages/" | sort -u | head -60
+          tail -5 mac.log
+          exit $status
       - name: Build the iOS app
         run: |
+          set +e
           xcodebuild -project Kith.xcodeproj -scheme KithiOS -destination 'generic/platform=iOS' \
-            CODE_SIGNING_ALLOWED=NO build | tail -40
-          test ${PIPESTATUS[0]} -eq 0
+            CODE_SIGNING_ALLOWED=NO build > ios.log 2>&1
+          status=$?
+          grep -E ": (error|warning): " ios.log | grep -v "/SourcePackages/" | sort -u | head -60
+          tail -5 ios.log
+          exit $status
