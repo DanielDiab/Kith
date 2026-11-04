@@ -36,6 +36,10 @@ struct SettingsView: View {
                 Text("Demo week (synthetic)").tag(KithSettings.DataSource.demo)
                 Text("My Calendar, Reminders and Contacts").tag(KithSettings.DataSource.apple)
             }
+            if model.settings.dataSource == .demo {
+                Toggle("Plant a poisoned invite (shows the data guard)", isOn: Binding(
+                    get: { model.settings.plantPoisonedInvite }, set: { v in update { $0.plantPoisonedInvite = v } }))
+            }
             if model.settings.dataSource == .apple {
                 Button("Grant access") {
                     Task {

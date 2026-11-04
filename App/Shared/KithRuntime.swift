@@ -24,6 +24,8 @@ struct KithSettings: Codable, Equatable, Sendable {
     var localModel = "qwen3:8b"
     var claudeModel = "claude-sonnet-5-5"
     var mcpEnabled = false
+    /// Demo only: add an invite whose title tries to instruct the assistant.
+    var plantPoisonedInvite = false
     /// Overrides per tool. A tool without an entry is on and shared with everyone.
     var grants: [String: ToolGrant] = [:]
 
@@ -69,10 +71,11 @@ actor KithRuntime {
 
     func configure(_ new: KithSettings) async {
         let sourceChanged = !configured || new.dataSource != settings.dataSource
+            || new.plantPoisonedInvite != settings.plantPoisonedInvite
         settings = new
         new.save()
         if sourceChanged {
-            store = new.dataSource == .demo ? SyntheticData.store() : EventKitStore()
+            store = new.dataSource == .demo ? SyntheticData.store(withPoisonedInvite: new.plantPoisonedInvite) : EventKitStore()
             registry = ToolRegistry(PersonalTools.all(store: store, format: LocalFormat(timeZone: timeZone)))
         }
         configured = true
