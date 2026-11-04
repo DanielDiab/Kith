@@ -31,7 +31,8 @@ public actor ToolGate {
 
     public init(
         registry: ToolRegistry, policy: PermissionPolicy, client: Client, pending: PendingWriteStore,
-        recorder: TraceRecorder, masker: PIIMasker, userText: String, detector: InjectionDetector = InjectionDetector()
+        recorder: TraceRecorder, masker: PIIMasker, userText: String, writeRequested: Bool? = nil,
+        detector: InjectionDetector = InjectionDetector()
     ) {
         self.registry = registry
         self.policy = policy
@@ -40,7 +41,9 @@ public actor ToolGate {
         self.recorder = recorder
         self.masker = masker
         self.detector = detector
-        self.writeRequested = WriteIntent.isRequested(in: userText)
+        // An MCP client calling a write tool is an explicit request from that client; the
+        // person still confirms it in the app. Inside the agent, intent comes from the message.
+        self.writeRequested = writeRequested ?? WriteIntent.isRequested(in: userText)
     }
 
     public var flaggedData: Bool { !flaggedFields.isEmpty }

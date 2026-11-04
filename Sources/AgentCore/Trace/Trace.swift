@@ -84,3 +84,36 @@ public actor TraceRecorder {
 
     public func all() -> [Span] { spans }
 }
+
+/// Recent traces from every client (app, Siri, MCP), newest last. The app's trace view and
+/// the MCP activity list read from here.
+public actor TraceLog {
+    private var traces: [Trace] = []
+    private let capacity: Int
+    private var continuations: [UUID: AsyncStream<Trace>.Continuation] = [:]
+
+    public init(capacity: Int = 200) {
+        self.capacity = capacity
+    }
+
+    public func append(_ trace: Trace) {
+        traces.append(trace)
+        if traces.count > capacity { traces.removeFirst(traces.count - capacity) }
+        for c in continuations.values { c.yield(trace) }
+    }
+
+    public func recent(_ n: Int = 50) -> [Trace] { Array(traces.suffix(n)) }
+
+    /// New traces as they arrive.
+    public func updates() -> AsyncStream<Trace> {
+        let id = UUID()
+        let (stream, continuation) = AsyncStream<Trace>.makeStream()
+        continuations[id] = continuation
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.remove(id) }
+        }
+        return stream
+    }
+
+    private func remove(_ id: UUID) { continuations[id] = nil }
+}

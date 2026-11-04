@@ -22,3 +22,24 @@ jobs:
         with:
           name: eval-results
           path: Evals/results/
+
+  apple:
+    name: Apple build (macOS, EventKit, Foundation Models)
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchains on this runner
+        run: |
+          ls -d /Applications/Xcode*.app || true
+          xcodebuild -version
+          swift --version
+      - name: Select the newest Xcode
+        run: |
+          newest=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Using $newest"
+          sudo xcode-select -s "$newest/Contents/Developer"
+          xcodebuild -version
+      - name: Build package (all targets, including AppleData)
+        run: swift build --build-tests
+      - name: Test package on macOS
+        run: swift test
