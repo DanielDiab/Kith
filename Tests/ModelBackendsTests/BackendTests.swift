@@ -18,6 +18,10 @@ final class StubHTTP: HTTPClient, @unchecked Sendable {
     init(_ replies: [(String, Int)]) { self.replies = replies }
 
     func send(_ request: URLRequest) async throws -> (Data, Int) {
+        record(request)
+    }
+
+    private func record(_ request: URLRequest) -> (Data, Int) {
         lock.lock()
         defer { lock.unlock() }
         if let body = request.httpBody, let json = try? JSONValue.parse(String(decoding: body, as: UTF8.self)) {
