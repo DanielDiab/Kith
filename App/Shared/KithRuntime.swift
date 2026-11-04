@@ -161,19 +161,30 @@ actor KithRuntime {
         await pending.all()
     }
 
-    /// Runs one read tool directly, without a model. App Intents use it for instant answers.
+    /// Runs one read tool without a model, for App Intents that answer instantly. It still goes
+    /// through the gate as `.siri`, so grants, the data guard and the trace apply.
     func read(_ tool: String, _ arguments: JSONValue) async throws -> JSONValue {
         await ensureConfigured()
-        guard let handler = registry.handler(named: tool), handler.spec.effect == .read else {
-            throw ToolError.notFound(tool)
-        }
-        return try await handler.call(arguments)
+        guard registry.spec(named: tool)?.effect == .read else { throw ToolError.notFound(tool) }
+        let recorder = TraceRecorder(masker: PIIMasker(), prices: .claude2026)
+        let gate = ToolGate(
+            registry: registry, policy: policy(), client: .siri, pending: pending, recorder: recorder,
+            masker: PIIMasker(), userText: "", writeRequested: false)
+        let started = Date()
+        let result = await gate.execute(ToolCall(id: "intent", name: tool, arguments: arguments))
+        await traces.append(Trace(id: "siri-\(UUID().uuidString.prefix(8))", client: .siri, userText: tool,
+                                  startedAt: started, spans: await recorder.all()))
+        if let message = result["error"]?.stringValue { throw ToolError.permissionDenied(message) }
+        return result
     }
 
-    /// For App Intents: the system already asked the person to confirm, so hold and run in one step.
-    /// It still goes through the pending store and the agent, so it is traced like any other write.
+    /// For App Intents: the system already asked the person to confirm, so hold and run in one
+    /// step. The grant for Siri is checked first, and the write goes through the pending store and
+    /// the agent, so it is traced like any other.
     func runConfirmedWrite(_ tool: String, _ arguments: JSONValue, summary: String) async throws -> ConfirmationResult {
         await ensureConfigured()
+        guard let spec = registry.spec(named: tool), spec.effect == .write else { throw ToolError.notFound(tool) }
+        if case .deny(let reason) = policy().decide(spec, for: .siri) { throw ToolError.permissionDenied(reason) }
         let write = await pending.hold(tool: tool, arguments: arguments, summary: summary, client: .siri, proposedAfterFlaggedData: false)
         return try await confirm(write.id)
     }
