@@ -45,11 +45,33 @@ public struct LocalFormat: Sendable {
         return (h < 10 ? "0" : "") + "\(h):" + (m < 10 ? "0" : "") + "\(m)"
     }
 
+    /// Sunday 1 … Saturday 7, in the person's time zone.
+    func weekday(_ date: Date) -> Int { calendar.component(.weekday, from: date) }
+
+    /// Whole local days from `a`'s day to `b`'s day.
+    func daysBetween(_ a: Date, _ b: Date) -> Int {
+        calendar.dateComponents([.day], from: calendar.startOfDay(for: a), to: calendar.startOfDay(for: b)).day ?? 0
+    }
+
+    /// "2026-11-06".
+    func isoDay(_ date: Date) -> String { String(iso(date).prefix(10)) }
+
+    func hourMinute(_ date: Date) -> (Int, Int) {
+        let c = calendar.dateComponents([.hour, .minute], from: date)
+        return (c.hour ?? 0, c.minute ?? 0)
+    }
+
     public func dateTime(_ date: Date) -> String { "\(day(date)), \(time(date))" }
 
     public func range(_ start: Date, _ end: Date) -> String {
         if calendar.isDate(start, inSameDayAs: end) { return "\(day(start)), \(time(start))–\(time(end))" }
         return "\(dateTime(start)) – \(dateTime(end))"
+    }
+
+    /// Local midnight of the day `date` falls on, moved by whole days.
+    public func startOfDay(_ date: Date, addingDays days: Int = 0) -> Date {
+        let start = calendar.startOfDay(for: date)
+        return days == 0 ? start : calendar.date(byAdding: .day, value: days, to: start)!
     }
 
     public func iso(_ date: Date) -> String { ISODate.format(date, in: timeZone) }

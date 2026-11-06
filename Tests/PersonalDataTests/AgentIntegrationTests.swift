@@ -15,7 +15,7 @@ struct Harness {
     ) async throws {
         store = SyntheticData.store()
         let format = LocalFormat(timeZone: SyntheticData.timeZone)
-        let handlers = PersonalTools.all(store: store, format: format)
+        let handlers = PersonalTools.all(store: store, format: format, now: { SyntheticData.now })
         let registry = ToolRegistry(handlers)
         let router = Router(profiles: [
             TierProfile(tier: .onDevice, model: "apple-on-device", contextTokens: 4_096, available: onDeviceAvailable),

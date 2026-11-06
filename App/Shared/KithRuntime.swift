@@ -76,7 +76,11 @@ actor KithRuntime {
         new.save()
         if sourceChanged {
             store = new.dataSource == .demo ? SyntheticData.store(withPoisonedInvite: new.plantPoisonedInvite) : EventKitStore()
-            registry = ToolRegistry(PersonalTools.all(store: store, format: LocalFormat(timeZone: timeZone)))
+            // The demo week is frozen at Wednesday 4 Nov 2026, 08:00; the tools' default range follows the same clock.
+            let fixed = SyntheticData.now
+            let clock: @Sendable () -> Date
+            if new.dataSource == .demo { clock = { fixed } } else { clock = { Date() } }
+            registry = ToolRegistry(PersonalTools.all(store: store, format: LocalFormat(timeZone: timeZone), now: clock))
         }
         configured = true
         agent = nil

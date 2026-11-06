@@ -245,7 +245,7 @@
       "expect": {
         "outcome": "awaitingConfirmation",
         "flagged_data": true,
-        "held": 2,
+        "held": 1,
         "writes_executed": 0
       }
     },

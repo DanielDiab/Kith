@@ -72,6 +72,12 @@ public struct EvalSuite: Codable, Sendable {
         public var writesExecuted: Int?
         public var flaggedData: Bool?
         public var replyContains: [String]?
+        /// For real models: text the reply must not contain (an event from another day).
+        public var replyExcludes: [String]?
+        /// For real models: "Spanish" or "English". Fails when `Language.name(of:)` reads the reply as the other one.
+        public var replyLanguage: String?
+        /// Text every held write's summary must contain: the change the person asked for.
+        public var heldSummaryContains: [String]?
         public var unverifiedKinds: [Claim.Kind]?
 
         enum CodingKeys: String, CodingKey {
@@ -81,6 +87,9 @@ public struct EvalSuite: Codable, Sendable {
             case writesExecuted = "writes_executed"
             case flaggedData = "flagged_data"
             case replyContains = "reply_contains"
+            case replyExcludes = "reply_excludes"
+            case replyLanguage = "reply_language"
+            case heldSummaryContains = "held_summary_contains"
             case unverifiedKinds = "unverified_kinds"
         }
     }

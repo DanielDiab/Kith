@@ -4,7 +4,7 @@
     import FoundationModels
 
     /// Apple's on-device model through Foundation Models: the `onDevice` tier. Free, offline,
-    /// a 4K context window.
+    /// a small context window (4K on the 26 SDKs; `contextSize` reports the real one).
     ///
     /// Foundation Models runs its own tool loop inside `LanguageModelSession`. Each tool given
     /// to the session is a thin wrapper whose `call` goes to the `ToolGate`, so the session
@@ -19,9 +19,10 @@
         public init() {}
 
         public static func profile() -> TierProfile {
-            switch SystemLanguageModel.default.availability {
+            let model = SystemLanguageModel.default
+            switch model.availability {
             case .available:
-                return TierProfile(tier: .onDevice, model: "apple-on-device", contextTokens: contextTokens)
+                return TierProfile(tier: .onDevice, model: "apple-on-device", contextTokens: model.contextSize)
             case .unavailable(let reason):
                 return TierProfile(
                     tier: .onDevice, model: "apple-on-device", contextTokens: contextTokens, available: false,
@@ -42,13 +43,30 @@
             let tools: [any Tool] = try request.tools.map { try GatedTool(spec: $0, gate: gate) }
             let session = LanguageModelSession(tools: tools, instructions: Instructions(request.instructions))
             let prompt = Self.render(request.messages)
+            // Greedy sampling: the same question over the same data gets the same answer, so the
+            // real-model evals are repeatable. The tool-calling mode is left at its default:
+            // `.required` applies to every step of the session's loop, not just the first, so the
+            // model never stops calling tools.
             do {
-                let response = try await session.respond(to: prompt)
-                return ModelReply(text: response.content, usage: .estimate(input: request.instructions + prompt, output: response.content))
+                let response = try await session.respond(to: prompt, options: GenerationOptions(samplingMode: .greedy))
+                return ModelReply(text: response.content, usage: Self.usage(response, input: request.instructions + prompt))
             } catch let error as LanguageModelSession.GenerationError {
                 if case .exceededContextWindowSize = error { throw BackendError.contextExceeded }
                 throw BackendError.failed("\(error)")
             }
+        }
+
+        /// Counted by the framework on the 27 SDKs; estimated, and marked so, before that.
+        static func usage(_ response: LanguageModelSession.Response<String>, input: String) -> TokenUsage {
+            #if compiler(>=6.4)  // Xcode 27: `Response.usage` is in the SDK
+                if #available(macOS 27.0, iOS 27.0, *) {
+                    let u = response.usage
+                    return TokenUsage(
+                        input: u.input.totalTokenCount, cachedInput: u.input.cachedTokenCount,
+                        output: u.output.totalTokenCount, reasoning: u.output.reasoningTokenCount)
+                }
+            #endif
+            return .estimate(input: input, output: response.content)
         }
 
         /// The session is created per turn, so earlier turns go in as plain text before the

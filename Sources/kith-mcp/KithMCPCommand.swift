@@ -33,7 +33,7 @@ struct KithMCPCommand {
 
     static func runDemo() async -> Never {
         let store = SyntheticData.store()
-        let registry = ToolRegistry(PersonalTools.all(store: store, format: LocalFormat(timeZone: SyntheticData.timeZone)))
+        let registry = ToolRegistry(PersonalTools.all(store: store, format: LocalFormat(timeZone: SyntheticData.timeZone), now: { SyntheticData.now }))
         let policy = PermissionPolicy.allowAll(registry.specs)
         let service = MCPService(
             registry: registry, policy: { policy }, pending: PendingWriteStore(), log: TraceLog(),

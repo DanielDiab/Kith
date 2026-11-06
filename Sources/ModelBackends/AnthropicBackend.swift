@@ -53,6 +53,8 @@ public struct AnthropicBackend: LanguageBackend {
         let headers = ["x-api-key": apiKey, "anthropic-version": "2023-06-01"]
         var usage = TokenUsage.zero
 
+        // No forced `tool_choice`: Claude Sonnet 5.5 and Opus 5.5 reject `any`/`tool` with a
+        // 400. The instructions and the agent's completeness check do the steering instead.
         for _ in 0..<maxRounds {
             var body: [String: JSONValue] = [
                 "model": .string(modelName), "max_tokens": .number(Double(maxTokens)),

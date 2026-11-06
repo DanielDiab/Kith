@@ -93,9 +93,17 @@ public protocol ToolHandler: Sendable {
     func call(_ arguments: JSONValue) async throws -> JSONValue
     /// One line a person reads before confirming a write ("Create “Dentist” on Wed 4 Nov, 10:00–10:45").
     func preview(_ arguments: JSONValue) async -> String
+    /// Turns a write's arguments into the exact ones that will run, before it is held: a
+    /// reminder named by title becomes its id, so what the person confirms can't change later.
+    /// `personSaid` is the person's message inside the agent, empty for MCP clients, whose
+    /// arguments are already explicit; a write can check its arguments against it. Throws
+    /// `ToolError` when the arguments don't name exactly one thing or contradict the message.
+    func resolve(_ arguments: JSONValue, personSaid: String) async throws -> JSONValue
 }
 
 extension ToolHandler {
+    public func resolve(_ arguments: JSONValue, personSaid: String) async throws -> JSONValue { arguments }
+
     public func preview(_ arguments: JSONValue) async -> String {
         "\(spec.name) \(arguments.jsonString())"
     }

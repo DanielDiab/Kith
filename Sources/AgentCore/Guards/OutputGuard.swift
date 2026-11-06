@@ -67,6 +67,10 @@ public struct OutputGuard: Sendable {
             checked += 1
             if !index.foldedText.contains(n) { unverified.append(Claim(kind: .name, text: name)) }
         }
+        for claim in pairings(inFolded: folded, index: index) {
+            checked += 1
+            unverified.append(claim)
+        }
         for m in Text.matches(#"[“"«]([^”"»\n]{3,80})[”"»]"#, in: answer) {
             guard let inner = m.groups[0] else { continue }
             checked += 1
@@ -74,26 +78,62 @@ public struct OutputGuard: Sendable {
                 unverified.append(Claim(kind: .quotedTitle, text: inner))
             }
         }
-        for claim in Self.writeClaims(inFolded: folded) {
+        let held = evidence.toolResults.contains { $0["status"]?.stringValue == "held_for_confirmation" }
+        for claim in Self.writeClaims(inFolded: folded, afterHeldWrite: held) {
             checked += 1
             unverified.append(Claim(kind: .writeWithoutAction, text: claim))
         }
         return OutputVerdict(unverified: unverified, checkedClaims: checked)
     }
 
+    /// Within one sentence or list line, a name that belongs to a dated item (an event's
+    /// attendee, a reminder's title) must belong to an item at one of the times said with it.
+    /// Small models attach the right name to the wrong event; each fact alone exists in the
+    /// data, so only the pair shows the error.
+    func pairings(inFolded text: String, index: EvidenceIndex) -> [Claim] {
+        guard !index.records.isEmpty else { return [] }
+        let names = knownNames.map(Text.fold).filter { $0.count >= 3 }
+        var out: [Claim] = []
+        for segment in text.split(whereSeparator: \.isNewline).flatMap({ $0.split(separator: try! Regex(#"[.;!?](?=\s|$)"#)) }) {
+            let line = String(segment)
+            let times = FactExtractor.extract(fromFolded: line).times
+            guard !times.isEmpty else { continue }
+            for name in names where line.contains(name) {
+                let holders = index.records.filter { $0.text.contains(name) }
+                guard !holders.isEmpty else { continue }  // a contact or the person's own words: no time to pair
+                if !holders.contains(where: { r in times.contains { EvidenceIndex.has($0, in: r.times) } }) {
+                    let said = times.map(\.text).joined(separator: ", ")
+                    out.append(Claim(kind: .pairing, text: "\(name) with \(said)"))
+                }
+            }
+        }
+        return out
+    }
+
     /// "Quedó agendado", "I've added it": inside a turn every write is still held, so any
     /// claim that one happened is false. Negated forms ("no se ha creado") are skipped.
-    static func writeClaims(inFolded text: String) -> [String] {
+    ///
+    /// With a write held this turn, "está marcado como hecho" describes that write, not the
+    /// data, so it is a claim too ("El recordatorio está marcado como hecho, pero espera
+    /// confirmación", from the on-device model).
+    static func writeClaims(inFolded text: String, afterHeldWrite: Bool = false) -> [String] {
         // Narrow on purpose: "la reunión está programada para las 10" describes data the
         // agent read, so plain "está"/"was" + participle is not treated as a claim.
         let participles =
             "(?:guardad|registrad|cread|agendad|programad|completad|marcad|anadid|agregad|apuntad)[oa]s?"
-        let patterns = [
+        var patterns = [
             #"\b(?:quedo|ha\s+quedado|quedaron|han\s+quedado|ha\s+sido|han\s+sido)\s+(?:correctamente\s+|exitosamente\s+)?"# + participles + #"\b"#,
             #"\b(?:he|hemos|se\s+ha|se\s+han|ya\s+he|ya\s+hemos)\s+(?:guardado|registrado|creado|agendado|programado|completado|marcado|anadido|agregado|apuntado)\b"#,
             #"\b(?:i've|i\s+have|we've|we\s+have|i)\s+(?:just\s+|successfully\s+)?(?:created|added|scheduled|saved|marked|completed|booked)\b"#,
             #"\b(?:has|have)\s+been\s+(?:successfully\s+)?(?:created|added|saved|booked)\b"#,
         ]
+        if afterHeldWrite {
+            patterns += [
+                // Completion only: "the event is scheduled for 7:00, waiting for you" is fair.
+                #"\b(?:esta|estan|queda|quedan)\s+(?:ya\s+)?(?:marcad[oa]s?\s+como\s+)?(?:hech[oa]s?|completad[oa]s?|terminad[oa]s?)\b"#,
+                #"\b(?:is|are)\s+(?:now\s+)?(?:marked\s+(?:as\s+)?)?(?:done|complete|completed)\b"#,
+            ]
+        }
         var out: [String] = []
         for p in patterns {
             for m in Text.matches(p, in: text) {
@@ -112,9 +152,14 @@ struct EvidenceIndex {
     struct LocalTime: Hashable { var hour: Int; var minute: Int }
     struct LocalDate: Hashable { var year: Int; var month: Int; var day: Int }
 
+    /// One dated item from a tool result (an event, a reminder with a due date): its text and
+    /// its local times, so a name can be checked against the time it's said with.
+    struct Record { var text: String; var times: Set<LocalTime> }
+
     var quantities: [Quantity] = []
     var times: Set<LocalTime> = []
     var dates: Set<LocalDate> = []
+    var records: [Record] = []
     var foldedText = ""
 
     init(_ evidence: Evidence, timeZone: TimeZone) {
@@ -124,6 +169,21 @@ struct EvidenceIndex {
         var qs: [Quantity] = []
         var ts: Set<LocalTime> = []
         var ds: Set<LocalDate> = []
+        var rs: [Record] = []
+
+        func localTime(_ date: Date) -> LocalTime {
+            let c = calendar.dateComponents([.hour, .minute], from: date)
+            return LocalTime(hour: c.hour ?? -1, minute: c.minute ?? -1)
+        }
+
+        func strings(_ value: JSONValue) -> [String] {
+            switch value {
+            case .string(let s): return [s]
+            case .array(let items): return items.flatMap(strings)
+            case .object(let fields): return fields.values.flatMap(strings)
+            default: return []
+            }
+        }
 
         func addInstant(_ date: Date) {
             let c = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
@@ -166,6 +226,9 @@ struct EvidenceIndex {
                 if let s = fields["start"]?.stringValue.flatMap(ISODate.parseInstant),
                    let e = fields["end"]?.stringValue.flatMap(ISODate.parseInstant) {
                     qs.append(Quantity(value: e.timeIntervalSince(s) / 60, unit: .minute))
+                    rs.append(Record(text: Text.fold(strings(value).joined(separator: " ")), times: [localTime(s), localTime(e)]))
+                } else if let due = fields["due"]?.stringValue.flatMap(ISODate.parseInstant) {
+                    rs.append(Record(text: Text.fold(strings(value).joined(separator: " ")), times: [localTime(due)]))
                 }
                 for key in fields.keys.sorted() {
                     walk(fields[key]!, path: path.isEmpty ? key : "\(path).\(key)")
@@ -180,10 +243,13 @@ struct EvidenceIndex {
         quantities = qs
         times = ts
         dates = ds
+        records = rs
         foldedText = texts.joined(separator: "\n")
     }
 
-    func hasTime(_ t: TimeClaim) -> Bool {
+    func hasTime(_ t: TimeClaim) -> Bool { Self.has(t, in: times) }
+
+    static func has(_ t: TimeClaim, in times: Set<LocalTime>) -> Bool {
         if times.contains(LocalTime(hour: t.hour, minute: t.minute)) { return true }
         if t.ambiguous12h {
             let other = t.hour == 12 ? 0 : (t.hour < 12 ? t.hour + 12 : t.hour - 12)

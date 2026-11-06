@@ -5,10 +5,13 @@ import Foundation
 /// person's offset plus a `_local` string; writes only describe what they'll do until the
 /// person confirms.
 public enum PersonalTools {
-    public static func all(store: any PersonalDataStore, format: LocalFormat) -> [any ToolHandler] {
+    /// `now` sets the default range of `calendar_list_events` (today and the six days after).
+    public static func all(
+        store: any PersonalDataStore, format: LocalFormat, now: @escaping @Sendable () -> Date = { Date() }
+    ) -> [any ToolHandler] {
         [
-            ListEvents(store: store, format: format),
-            CreateEvent(store: store, format: format),
+            ListEvents(store: store, format: format, now: now),
+            CreateEvent(store: store, format: format, now: now),
             ListReminders(store: store, format: format),
             CompleteReminder(store: store, format: format),
             SearchContacts(store: store),
@@ -51,22 +54,38 @@ public enum PersonalTools {
 public struct ListEvents: ToolHandler {
     let store: any PersonalDataStore
     let format: LocalFormat
+    var now: @Sendable () -> Date = { Date() }
 
     public let spec = ToolSpec(
         name: "calendar_list_events",
-        description: "List the person's calendar events between two moments. Use it for any question about their schedule.",
+        description: "List the person's calendar events with title, local time, duration, place, attendees and notes, "
+            + "and which of them overlap. Use it for any question about their schedule: what, when, how long, where, with whom, conflicts.",
         effect: .read,
         parameters: [
-            ToolParameter("from", type: "date-time", description: "Start, ISO 8601 with offset (2026-11-04T00:00:00-05:00) or a day (2026-11-04)."),
-            ToolParameter("to", type: "date-time", description: "End, same format. A day means the end of that day."),
+            ToolParameter("from", type: "date-time", description: "First day (2026-11-04) or instant with offset. Omit both for the coming week.", required: false),
+            ToolParameter("to", type: "date-time", description: "Last day, included, or instant. Omit for just the from day.", required: false),
         ]
     )
 
+    /// Small models often leave the range out or send only one end, so both are optional. A
+    /// lone `from` means that day: asked "¿Tengo algo el jueves?" with the whole week in hand,
+    /// the on-device model listed Friday's lunch under Thursday.
     public func call(_ arguments: JSONValue) async throws -> JSONValue {
-        guard let fromText = arguments["from"]?.stringValue, let from = format.parse(fromText),
-              let toText = arguments["to"]?.stringValue, let to = format.parse(toText, endOfDay: true)
-        else {
-            throw ToolError.invalidArguments("from and to must look like 2026-11-04T09:00:00-05:00 or 2026-11-04.")
+        let fromText = arguments["from"]?.stringValue.flatMap { $0.isEmpty ? nil : $0 }
+        let toText = arguments["to"]?.stringValue.flatMap { $0.isEmpty ? nil : $0 }
+        let from: Date
+        if let fromText {
+            guard let parsed = format.parse(fromText) else { throw Self.badDate }
+            from = parsed
+        } else {
+            from = format.startOfDay(now())
+        }
+        let to: Date
+        if let toText {
+            guard let parsed = format.parse(toText, endOfDay: true) else { throw Self.badDate }
+            to = parsed
+        } else {
+            to = format.startOfDay(from, addingDays: fromText == nil ? 7 : 1)
         }
         guard to > from else { throw ToolError.invalidArguments("to must be after from.") }
         guard to.timeIntervalSince(from) <= 31 * 86_400 else {
@@ -76,23 +95,44 @@ public struct ListEvents: ToolHandler {
         return [
             "events": .array(events.map { PersonalTools.eventJSON($0, format) }),
             "count": .number(Double(events.count)),
+            "overlaps": .array(Self.overlaps(events).map { a, b in
+                [
+                    "events": [.string(a.title), .string(b.title)],
+                    "overlap_local": .string(format.range(b.start, min(a.end, b.end))),
+                ]
+            }),
             "range_local": .string("\(format.dateTime(from)) – \(format.dateTime(to))"),
         ]
     }
+
+    /// Pairs of events that overlap in time. Computed here because small models can't be
+    /// trusted with interval arithmetic: asked for conflicts, the on-device model and Qwen 8B
+    /// both missed a 14:00–15:30 review overlapping a 15:00 interview.
+    static func overlaps(_ events: [CalendarEvent]) -> [(CalendarEvent, CalendarEvent)] {
+        let sorted = events.sorted { $0.start < $1.start }
+        var out: [(CalendarEvent, CalendarEvent)] = []
+        for (i, a) in sorted.enumerated() {
+            for b in sorted[(i + 1)...] where b.start < a.end { out.append((a, b)) }
+        }
+        return out
+    }
+
+    static let badDate = ToolError.invalidArguments("from and to must look like 2026-11-04 or 2026-11-04T09:00:00-05:00.")
 }
 
 public struct CreateEvent: ToolHandler {
     let store: any PersonalDataStore
     let format: LocalFormat
+    var now: @Sendable () -> Date = { Date() }
 
     public let spec = ToolSpec(
         name: "calendar_create_event",
-        description: "Propose a new calendar event. It is held until the person confirms it in the app.",
+        description: "Propose a new calendar event when the person asks to schedule something. It is held until they confirm it in the app.",
         effect: .write,
         parameters: [
             ToolParameter("title", type: "string", description: "Event title."),
-            ToolParameter("start", type: "date-time", description: "Start, ISO 8601 with offset."),
-            ToolParameter("end", type: "date-time", description: "End, ISO 8601 with offset."),
+            ToolParameter("start", type: "date-time", description: "Start, ISO 8601 with offset (2026-11-06T07:00:00-05:00)."),
+            ToolParameter("end", type: "date-time", description: "End, same format."),
             ToolParameter("location", type: "string", description: "Optional place.", required: false),
         ]
     )
@@ -112,6 +152,37 @@ public struct CreateEvent: ToolHandler {
         return ["created": PersonalTools.eventJSON(event, format)]
     }
 
+    /// The day and the start and end must be the ones the person said, when they said any.
+    public func resolve(_ arguments: JSONValue, personSaid: String) async throws -> JSONValue {
+        let d = try draft(arguments)
+        let today = now()
+        let days = StatedTimes.days(in: personSaid, today: format.weekday(today))
+        if !days.isEmpty {
+            let offset = format.daysBetween(today, d.start)
+            guard days.contains(offset) else {
+                let said = days.sorted().map { format.isoDay(format.startOfDay(today, addingDays: $0)) }.joined(separator: " or ")
+                throw ToolError.invalidArguments(
+                    "The person asked for \(said), but start is on \(format.isoDay(d.start)). Call again on the day they said.")
+            }
+        }
+        let stated = StatedTimes.parse(personSaid)
+        guard !stated.isEmpty else { return arguments }
+        let (sh, sm) = format.hourMinute(d.start)
+        let (eh, em) = format.hourMinute(d.end)
+        if let range = stated.range {
+            guard range.start.matches(hour: sh, minute: sm), range.end.matches(hour: eh, minute: em) else {
+                throw ToolError.invalidArguments(
+                    "The person asked for \(range.start.label) to \(range.end.label), but start is \(format.time(d.start)) and end is "
+                        + "\(format.time(d.end)). Call again with exactly those times.")
+            }
+        } else if !stated.times.contains(where: { $0.matches(hour: sh, minute: sm) }) {
+            let said = stated.times.map(\.label).joined(separator: ", ")
+            throw ToolError.invalidArguments(
+                "The person said \(said), but start is \(format.time(d.start)). Call again with the start they asked for.")
+        }
+        return arguments
+    }
+
     public func preview(_ arguments: JSONValue) async -> String {
         guard let d = try? draft(arguments) else { return "Create an event (invalid arguments)" }
         let place = d.location.map { " · \($0)" } ?? ""
@@ -125,7 +196,7 @@ public struct ListReminders: ToolHandler {
 
     public let spec = ToolSpec(
         name: "reminders_list",
-        description: "List the person's reminders. Open ones by default.",
+        description: "List the person's reminders (tasks) with due date and priority. Open ones by default.",
         effect: .read,
         parameters: [
             ToolParameter("include_completed", type: "boolean", description: "Also list completed reminders.", required: false)
@@ -144,15 +215,48 @@ public struct CompleteReminder: ToolHandler {
 
     public let spec = ToolSpec(
         name: "reminders_complete",
-        description: "Propose marking a reminder as done. It is held until the person confirms it in the app.",
+        description: "Propose marking a reminder as done when the person asks. It is held until they confirm it in the app.",
         effect: .write,
-        parameters: [ToolParameter("id", type: "string", description: "The reminder id from reminders_list.")]
+        parameters: [
+            ToolParameter("title", type: "string", description: "Words from the reminder's title, like pasaporte.", required: false),
+            ToolParameter("id", type: "string", description: "Or its id from reminders_list.", required: false),
+        ]
     )
 
+    /// Runs only after confirmation, and by then `resolve` has replaced any title with an id.
     public func call(_ arguments: JSONValue) async throws -> JSONValue {
-        guard let id = arguments["id"]?.stringValue else { throw ToolError.invalidArguments("Need the reminder id.") }
+        let id = try await resolveID(arguments)
         let r = try await store.completeReminder(id: id)
         return ["completed": PersonalTools.reminderJSON(r, format)]
+    }
+
+    /// A title is looked up among open reminders and must name exactly one, so the held write
+    /// carries an id and the confirmation card shows the reminder that will change.
+    public func resolve(_ arguments: JSONValue, personSaid: String) async throws -> JSONValue {
+        ["id": .string(try await resolveID(arguments))]
+    }
+
+    func resolveID(_ arguments: JSONValue) async throws -> String {
+        if let id = arguments["id"]?.stringValue, !id.isEmpty {
+            guard (try? await store.reminder(id: id)) != nil else { throw ToolError.notFound("No reminder has the id \(id).") }
+            return id
+        }
+        guard let title = arguments["title"]?.stringValue, title.count >= 3 else {
+            throw ToolError.invalidArguments("Give title (words from the reminder) or id.")
+        }
+        let words = TextMatch.words(title)
+        let open = try await store.reminders(includeCompleted: false)
+        let matches = open.filter { r in
+            let have = Set(TextMatch.words(r.title))
+            return !words.isEmpty && words.allSatisfy { w in have.contains { $0.hasPrefix(w) || w.hasPrefix($0) } }
+        }
+        switch matches.count {
+        case 1: return matches[0].id
+        case 0: throw ToolError.notFound("No open reminder matches “\(title)”. Call reminders_list to see them.")
+        default:
+            let names = matches.prefix(5).map { "\($0.title) (\($0.id))" }.joined(separator: ", ")
+            throw ToolError.invalidArguments("Several reminders match: \(names). Call again with the id.")
+        }
     }
 
     public func preview(_ arguments: JSONValue) async -> String {
@@ -162,12 +266,24 @@ public struct CompleteReminder: ToolHandler {
     }
 }
 
+/// Word matching for titles named in a request: folded, short words and articles dropped.
+enum TextMatch {
+    static let stop: Set<String> = ["el", "la", "los", "las", "de", "del", "un", "una", "the", "a", "an", "of", "my", "mi", "to", "para"]
+
+    static func words(_ s: String) -> [String] {
+        s.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+            .split { !$0.isLetter && !$0.isNumber }
+            .map(String.init)
+            .filter { $0.count >= 3 && !stop.contains($0) }
+    }
+}
+
 public struct SearchContacts: ToolHandler {
     let store: any PersonalDataStore
 
     public let spec = ToolSpec(
         name: "contacts_search",
-        description: "Find the person's contacts by name, organization or email.",
+        description: "Find the person's contacts by name, organization or email: emails, phones, organization.",
         effect: .read,
         parameters: [ToolParameter("query", type: "string", description: "Part of a name, organization or email.")]
     )

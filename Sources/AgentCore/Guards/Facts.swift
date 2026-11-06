@@ -69,7 +69,9 @@ public struct Quantity: Codable, Sendable, Equatable {
 /// Something in the answer the guard can check against the evidence.
 public struct Claim: Codable, Sendable, Equatable {
     public enum Kind: String, Codable, Sendable {
-        case quantity, count, time, date, name, quotedTitle, writeWithoutAction
+        /// A name said with the time of an item it doesn't belong to ("the 10:00 dentist, with
+        /// Camila" when Camila is on the 14:00 review).
+        case quantity, count, time, date, name, quotedTitle, writeWithoutAction, pairing
     }
 
     public var kind: Kind

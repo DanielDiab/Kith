@@ -14,6 +14,8 @@ public struct CaseResult: Codable, Sendable {
     public var costUSD: Double
     public var referenceCostUSD: Double
     public var tokens: Int
+    /// What the person would have read. Kept so a failing real-model case can be diagnosed.
+    public var reply: String?
 }
 
 public struct SuiteResult: Codable, Sendable {
@@ -92,7 +94,7 @@ public enum Runner {
         let format = LocalFormat(timeZone: SyntheticData.timeZone)
         await plant(c.fixtures, in: store, format: format)
 
-        let registry = ToolRegistry(PersonalTools.all(store: store, format: format))
+        let registry = ToolRegistry(PersonalTools.all(store: store, format: format, now: { SyntheticData.now }))
         let unavailable = Set(c.unavailable ?? [])
         let router = Router(profiles: (live?.profiles ?? profiles).map { p in
             var p = p
@@ -122,7 +124,8 @@ public enum Runner {
         return CaseResult(
             id: c.id, passed: failures.isEmpty, failures: failures, outcome: turn.outcome, tier: turn.tier,
             calledTools: turn.calledTools, deniedTools: turn.deniedTools, writesExecuted: executed,
-            costUSD: turn.trace.costUSD, referenceCostUSD: turn.trace.referenceCostUSD, tokens: turn.trace.usage.total)
+            costUSD: turn.trace.costUSD, referenceCostUSD: turn.trace.referenceCostUSD, tokens: turn.trace.usage.total,
+            reply: turn.reply)
     }
 
     static func check(_ e: EvalSuite.Expectation, turn: AgentTurn, executed: Int) -> [String] {
@@ -139,6 +142,14 @@ public enum Runner {
         if let w = e.writesExecuted, w != executed { f.append("writes executed \(executed), expected \(w)") }
         if let flagged = e.flaggedData, flagged != turn.flaggedData { f.append("flagged data \(turn.flaggedData), expected \(flagged)") }
         for s in e.replyContains ?? [] where !turn.reply.contains(s) { f.append("reply lacks “\(s)”") }
+        for s in e.replyExcludes ?? [] where turn.reply.contains(s) { f.append("reply contains “\(s)”") }
+        // Fails only on a reply that reads as another language; a short one may read as neither.
+        if let language = e.replyLanguage, let got = Language.name(of: turn.reply), got != language {
+            f.append("reply is in \(got), expected \(language)")
+        }
+        for s in e.heldSummaryContains ?? [] {
+            for w in turn.heldWrites where !w.summary.contains(s) { f.append("held “\(w.summary)” lacks “\(s)”") }
+        }
         if let kinds = e.unverifiedKinds {
             let got = Set(turn.unverifiedClaims.map(\.kind))
             if got != Set(kinds) { f.append("unverified \(got.map(\.rawValue).sorted()), expected \(kinds.map(\.rawValue).sorted())") }
