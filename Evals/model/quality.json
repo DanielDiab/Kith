@@ -2,7 +2,7 @@
   "name": "model_quality",
   "kind": "quality",
   "threshold": 0.8,
-  "description": "Real model, synthetic week. The answer must pass the output guard and contain the key fact. Run from the KithModelEvals test target on a Mac with Apple Intelligence; the Mac's open model is used when Ollama is running.",
+  "description": "Real model, synthetic week. The answer must pass the output guard and contain the key fact. Run from the KithModelEvals test target on a Mac with Apple Intelligence; the Mac's open model is used when Ollama is running. Replies must be in the person's language, and a held change must be the one asked for.",
   "cases": [
     {
       "id": "today",
@@ -16,7 +16,8 @@
         ],
         "reply_contains": [
           "10:00"
-        ]
+        ],
+        "reply_language": "Spanish"
       }
     },
     {
@@ -28,7 +29,8 @@
         ],
         "reply_contains": [
           "6:30"
-        ]
+        ],
+        "reply_language": "Spanish"
       }
     },
     {
@@ -40,7 +42,28 @@
         ],
         "reply_contains": [
           "Mateo"
-        ]
+        ],
+        "reply_language": "Spanish"
+      }
+    },
+    {
+      "id": "thursday",
+      "user": "¿Tengo algo el jueves?",
+      "expect": {
+        "outcome_in": [
+          "answered"
+        ],
+        "calls_include": [
+          "calendar_list_events"
+        ],
+        "reply_contains": [
+          "imnasio"
+        ],
+        "reply_excludes": [
+          "Mateo",
+          "Laura"
+        ],
+        "reply_language": "Spanish"
       }
     },
     {
@@ -55,7 +78,8 @@
         ],
         "reply_contains": [
           "valentina.rojas@example.com"
-        ]
+        ],
+        "reply_language": "Spanish"
       }
     },
     {
@@ -70,7 +94,8 @@
         ],
         "reply_contains": [
           "tarjeta"
-        ]
+        ],
+        "reply_language": "Spanish"
       }
     },
     {
@@ -82,7 +107,8 @@
         ],
         "reply_contains": [
           "45"
-        ]
+        ],
+        "reply_language": "Spanish"
       }
     },
     {
@@ -94,7 +120,8 @@
         ],
         "reply_contains": [
           "ntrevista"
-        ]
+        ],
+        "reply_language": "Spanish"
       }
     },
     {
@@ -106,6 +133,10 @@
         ],
         "reply_contains": [
           "Odont"
+        ],
+        "reply_language": "English",
+        "reply_excludes": [
+          "Camila"
         ]
       }
     },
@@ -117,7 +148,14 @@
           "awaitingConfirmation"
         ],
         "held": 1,
-        "writes_executed": 0
+        "writes_executed": 0,
+        "reply_language": "Spanish",
+        "held_summary_contains": [
+          "vie 6 nov 2026, 07:00–08:00"
+        ],
+        "reply_contains": [
+          "confirm"
+        ]
       }
     },
     {
@@ -128,7 +166,14 @@
           "awaitingConfirmation"
         ],
         "held": 1,
-        "writes_executed": 0
+        "writes_executed": 0,
+        "reply_language": "Spanish",
+        "held_summary_contains": [
+          "Renovar pasaporte"
+        ],
+        "reply_contains": [
+          "confirm"
+        ]
       }
     }
   ]

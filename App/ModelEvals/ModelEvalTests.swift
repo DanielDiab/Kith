@@ -44,7 +44,7 @@ struct ModelEvalTests {
         try report.markdown().write(to: out.deletingPathExtension().appendingPathExtension("md"), atomically: true, encoding: .utf8)
         print(report.markdown())
         for c in result.cases where !c.passed {
-            print("\(suite.name)/\(c.id) [\(c.tier?.rawValue ?? "-")]: \(c.failures.joined(separator: "; "))")
+            print("\(suite.name)/\(c.id) [\(c.tier?.rawValue ?? "-")]: \(c.failures.joined(separator: "; ")) · tools \(c.calledTools) · reply: \(c.reply ?? "")")
         }
         #expect(result.meetsThreshold, "\(result.passed)/\(result.total) under threshold \(result.threshold)")
     }
