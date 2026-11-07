@@ -9,7 +9,9 @@ struct KithiOSApp: App {
         WindowGroup {
             TabView {
                 NavigationStack {
-                    ChatView().navigationTitle("Kith")
+                    ChatView()
+                        .navigationTitle("Kith")
+                        .navigationBarTitleDisplayMode(.inline)
                 }
                 .tabItem { Label("Ask", systemImage: "bubble.left.and.text.bubble.right") }
 

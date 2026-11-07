@@ -11,17 +11,35 @@ struct SettingsView: View {
     @State private var accessMessage: String?
 
     var body: some View {
-        Form {
-            dataSection
-            privacySection
-            modelsSection
-            toolsSection
-            #if os(macOS)
-                MCPSection()
-            #endif
-        }
-        .formStyle(.grouped)
-        .task { await model.refresh() }
+        #if os(macOS)
+            TabView {
+                Form { privacySection; dataSection }
+                    .formStyle(.grouped)
+                    .tabItem { Label("General", systemImage: "gearshape") }
+                Form { modelsSection; localModelSection; claudeSection }
+                    .formStyle(.grouped)
+                    .tabItem { Label("Models", systemImage: "cpu") }
+                Form { toolsSection }
+                    .formStyle(.grouped)
+                    .tabItem { Label("Tools", systemImage: "wrench.and.screwdriver") }
+                Form { MCPSection() }
+                    .formStyle(.grouped)
+                    .tabItem { Label("MCP", systemImage: "point.3.connected.trianglepath.dotted") }
+            }
+            .frame(width: 560, height: 560)
+            .task { await model.refresh() }
+        #else
+            Form {
+                privacySection
+                dataSection
+                modelsSection
+                localModelSection
+                claudeSection
+                toolsSection
+            }
+            .formStyle(.grouped)
+            .task { await model.refresh() }
+        #endif
     }
 
     private func update(_ change: (inout KithSettings) -> Void) {
@@ -30,61 +48,108 @@ struct SettingsView: View {
         Task { await model.apply(s) }
     }
 
-    private var dataSection: some View {
-        Section("Data") {
-            Picker("Source", selection: Binding(get: { model.settings.dataSource }, set: { v in update { $0.dataSource = v } })) {
-                Text("Demo week (synthetic)").tag(KithSettings.DataSource.demo)
-                Text("My Calendar, Reminders and Contacts").tag(KithSettings.DataSource.apple)
-            }
-            if model.settings.dataSource == .demo {
-                Toggle("Plant a poisoned invite (shows the data guard)", isOn: Binding(
-                    get: { model.settings.plantPoisonedInvite }, set: { v in update { $0.plantPoisonedInvite = v } }))
-            }
-            if model.settings.dataSource == .apple {
-                Button("Grant access") {
-                    Task {
-                        let a = await model.requestAppleAccess()
-                        accessMessage = "Calendar \(a.calendar ? "✓" : "✗") · Reminders \(a.reminders ? "✓" : "✗") · Contacts \(a.contacts ? "✓" : "✗")"
-                    }
-                }
-                if let accessMessage { Text(accessMessage).font(.caption) }
-            }
-        }
-    }
+    // MARK: Sections
 
     private var privacySection: some View {
         Section {
-            Picker("Where answers may run", selection: Binding(get: { model.settings.privacy }, set: { v in update { $0.privacy = v } })) {
-                Text("This device only").tag(PrivacyMode.deviceOnly)
-                Text("My own hardware (device + Mac)").tag(PrivacyMode.ownHardware)
-                Text("Allow Claude when needed").tag(PrivacyMode.allowCloud)
+            ForEach([PrivacyMode.deviceOnly, .ownHardware, .allowCloud], id: \.self) { mode in
+                PrivacyOptionRow(mode: mode, selected: model.settings.privacy == mode) {
+                    update { $0.privacy = mode }
+                }
             }
         } header: {
-            Text("Privacy")
+            Text("Where answers may run")
         } footer: {
-            Text("The router decides in code before any model runs. Claude is only used when this allows it and nothing local fits.")
+            Text("The router decides in code before any model runs, and writes its reasons into every answer's details.")
+        }
+    }
+
+    private var dataSection: some View {
+        Section {
+            Picker("Source", selection: Binding(get: { model.settings.dataSource }, set: { v in update { $0.dataSource = v } })) {
+                Text("Demo week").tag(KithSettings.DataSource.demo)
+                Text("My Calendar, Reminders and Contacts").tag(KithSettings.DataSource.apple)
+            }
+            if model.settings.dataSource == .demo {
+                Toggle(isOn: Binding(get: { model.settings.plantPoisonedInvite }, set: { v in update { $0.plantPoisonedInvite = v } })) {
+                    Text("Plant a poisoned invite")
+                    Text("Adds an event whose title tries to instruct the assistant, to see the data guard withhold it.")
+                }
+            }
+            if model.settings.dataSource == .apple {
+                LabeledContent("Access") {
+                    Button("Grant Access…") {
+                        Task {
+                            let a = await model.requestAppleAccess()
+                            accessMessage = "Calendar \(a.calendar ? "✓" : "✗")  Reminders \(a.reminders ? "✓" : "✗")  Contacts \(a.contacts ? "✓" : "✗")"
+                        }
+                    }
+                }
+                if let accessMessage { Text(accessMessage).font(.callout).foregroundStyle(.secondary) }
+            }
+        } header: {
+            Text("Data")
+        } footer: {
+            Text(model.settings.dataSource == .demo
+                 ? "A made-up week frozen at Wednesday 4 November, 08:00. Safe for demos and screenshots."
+                 : "Kith reads your data on this device. Changes always wait for your confirmation.")
         }
     }
 
     private var modelsSection: some View {
-        Section("Models") {
+        Section {
             ForEach(model.profiles, id: \.tier) { p in
-                HStack {
+                LabeledContent {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(p.available ? Color.green : Color.secondary.opacity(0.5))
+                            .frame(width: 7, height: 7)
+                        Text(p.available ? p.model : (p.unavailableReason ?? "Unavailable"))
+                            .foregroundStyle(p.available ? .primary : .secondary)
+                    }
+                    .font(.callout)
+                } label: {
                     Label(p.tier.label, systemImage: p.tier.symbol)
-                    Spacer()
-                    Text(p.available ? p.model : (p.unavailableReason ?? "unavailable"))
-                        .font(.caption)
-                        .foregroundStyle(p.available ? .green : .secondary)
                 }
             }
-            Toggle("Use an open model on my Mac (Ollama)", isOn: Binding(get: { model.settings.useLocalModel }, set: { v in update { $0.useLocalModel = v } }))
-            TextField("Endpoint", text: Binding(get: { model.settings.localModelURL }, set: { v in update { $0.localModelURL = v } }))
-            TextField("Model", text: Binding(get: { model.settings.localModel }, set: { v in update { $0.localModel = v } }))
-            SecureField(model.claudeKeySet ? "Claude API key (saved in Keychain)" : "Claude API key (optional)", text: $claudeKey)
-                .onSubmit { Task { await model.setClaudeKey(claudeKey); claudeKey = "" } }
-            if model.claudeKeySet {
-                Button("Remove Claude key", role: .destructive) { Task { await model.setClaudeKey("") } }
+        } header: {
+            Text("Models")
+        } footer: {
+            Text("Simple questions go to the cheapest model that fits; a failed check moves the question up one tier.")
+        }
+    }
+
+    private var localModelSection: some View {
+        Section {
+            Toggle("Use an open model on my Mac", isOn: Binding(get: { model.settings.useLocalModel }, set: { v in update { $0.useLocalModel = v } }))
+            if model.settings.useLocalModel {
+                TextField("Endpoint", text: Binding(get: { model.settings.localModelURL }, set: { v in update { $0.localModelURL = v } }))
+                TextField("Model", text: Binding(get: { model.settings.localModel }, set: { v in update { $0.localModel = v } }))
             }
+        } header: {
+            Text("Your Mac")
+        } footer: {
+            Text("Any OpenAI-compatible server works. With Ollama: ollama pull qwen3:8b")
+        }
+    }
+
+    private var claudeSection: some View {
+        Section {
+            if model.claudeKeySet {
+                LabeledContent("API key") {
+                    HStack {
+                        Label("Saved in Keychain", systemImage: "key.fill").foregroundStyle(.secondary)
+                        Button("Remove", role: .destructive) { Task { await model.setClaudeKey("") } }
+                    }
+                }
+            } else {
+                SecureField("API key", text: $claudeKey, prompt: Text("sk-ant-…"))
+                    .onSubmit { Task { await model.setClaudeKey(claudeKey); claudeKey = "" } }
+            }
+        } header: {
+            Text("Claude")
+        } footer: {
+            Text("Optional. Used only when “Allow Claude” is on and nothing local fits.")
         }
     }
 
@@ -98,6 +163,40 @@ struct SettingsView: View {
         } footer: {
             Text("Writes are always held for your confirmation, whoever proposes them. “This device only” hides a tool from MCP clients.")
         }
+    }
+}
+
+/// One privacy mode: what it's called, what it means, and a checkmark when it's the one in use.
+struct PrivacyOptionRow: View {
+    let mode: PrivacyMode
+    let selected: Bool
+    let choose: () -> Void
+
+    var body: some View {
+        Button(action: choose) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: mode.symbol)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(mode.title).foregroundStyle(.primary)
+                    Text(mode.explanation)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 

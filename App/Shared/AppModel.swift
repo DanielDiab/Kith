@@ -9,6 +9,8 @@ struct ChatItem: Identifiable, Equatable {
     var fromPerson: Bool
     var text: String
     var turn: AgentTurn?
+    /// A short system notice (a change confirmed or discarded) rather than an answer.
+    var notice: String?
 }
 
 /// The UI's view of the runtime. Everything that touches data goes through `KithRuntime`.
@@ -76,7 +78,7 @@ final class AppModel {
     func confirm(_ write: PendingWrite) async {
         do {
             _ = try await runtime.confirm(write.id)
-            items.append(ChatItem(fromPerson: false, text: "Done: \(write.summary)"))
+            items.append(ChatItem(fromPerson: false, text: "Done: \(write.summary)", notice: "checkmark.circle.fill"))
         } catch {
             lastError = "Couldn't apply “\(write.summary)”: \(error)"
         }
@@ -85,8 +87,20 @@ final class AppModel {
 
     func reject(_ write: PendingWrite) async {
         try? await runtime.reject(write.id)
-        items.append(ChatItem(fromPerson: false, text: "Discarded: \(write.summary)"))
+        items.append(ChatItem(fromPerson: false, text: "Discarded: \(write.summary)", notice: "xmark.circle"))
         await refresh()
+    }
+
+    /// Clears the conversation. Changes waiting for confirmation stay where they are.
+    func newConversation() {
+        guard !busy else { return }
+        items.removeAll()
+    }
+
+    func setPrivacy(_ mode: PrivacyMode) async {
+        var s = settings
+        s.privacy = mode
+        await apply(s)
     }
 
     func requestAppleAccess() async -> EventKitStore.Access {
@@ -109,7 +123,7 @@ extension Tier {
 
     var symbol: String {
         switch self {
-        case .onDevice: return "iphone"
+        case .onDevice: return "apple.intelligence"
         case .localOpen: return "desktopcomputer"
         case .claude: return "cloud"
         }
@@ -139,5 +153,31 @@ enum Format {
     static func markdown(_ text: String) -> AttributedString {
         let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
         return (try? AttributedString(markdown: text, options: options)) ?? AttributedString(text)
+    }
+}
+
+extension PrivacyMode {
+    var title: String {
+        switch self {
+        case .deviceOnly: return "This device only"
+        case .ownHardware: return "My devices"
+        case .allowCloud: return "Allow Claude"
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .deviceOnly: return "Only Apple's on-device model answers. Nothing leaves this device."
+        case .ownHardware: return "This device, or the open model on your Mac for harder questions. Nothing leaves your hardware."
+        case .allowCloud: return "Claude answers only when nothing local can. What it reads is sanitized first."
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .deviceOnly: return "lock.shield"
+        case .ownHardware: return "macbook.and.iphone"
+        case .allowCloud: return "cloud"
+        }
     }
 }

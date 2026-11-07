@@ -13,7 +13,9 @@ struct KithMacApp: App {
         WindowGroup("Kith", id: "main") {
             ChatView()
                 .environment(model)
-                .frame(minWidth: 520, minHeight: 560)
+                .navigationTitle("Kith")
+                .navigationSubtitle(model.settings.privacy.title)
+                .frame(minWidth: 480, minHeight: 520)
                 .task { await model.start() }
         }
         .defaultSize(width: 640, height: 760)
@@ -30,7 +32,6 @@ struct KithMacApp: App {
         Settings {
             SettingsView()
                 .environment(model)
-                .frame(width: 560, height: 640)
         }
     }
 }
@@ -44,23 +45,33 @@ struct MenuBarPanel: View {
     @State private var expanded = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            TextField("Ask Kith", text: $draft)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit {
-                    let text = draft
-                    draft = ""
-                    Task { await model.send(text) }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                TextField("Ask Kith", text: $draft)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit {
+                        let text = draft
+                        draft = ""
+                        Task { await model.send(text) }
+                    }
+                PrivacyMenu()
+            }
+            if model.busy { ThinkingRow() }
+            if let last = model.items.last(where: { !$0.fromPerson && $0.notice == nil }) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(Format.markdown(last.text)).textSelection(.enabled)
+                        if let turn = last.turn {
+                            AnswerFooter(turn: turn, expanded: $expanded)
+                            if expanded { TraceView(trace: turn.trace) }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-            if model.busy { ProgressView().controlSize(.small) }
-            if let last = model.items.last(where: { !$0.fromPerson }) {
-                Text(Format.markdown(last.text)).lineLimit(6).textSelection(.enabled)
-                if let turn = last.turn { TurnBadge(turn: turn, expanded: $expanded) }
-                if expanded, let turn = last.turn { ScrollView { TraceView(trace: turn.trace) }.frame(maxHeight: 260) }
+                .frame(maxHeight: expanded ? 420 : 220)
             }
             if !model.pending.isEmpty {
-                Divider()
-                ScrollView { PendingWritesView() }.frame(maxHeight: 280)
+                ScrollView { PendingWritesView() }.frame(maxHeight: 300)
             }
             Divider()
             HStack {
@@ -72,8 +83,9 @@ struct MenuBarPanel: View {
                 SettingsLink { Text("Settings…") }
                 Button("Quit") { NSApp.terminate(nil) }
             }
+            .buttonStyle(.borderless)
         }
-        .padding(12)
-        .frame(width: 360)
+        .padding(14)
+        .frame(width: 380)
     }
 }
