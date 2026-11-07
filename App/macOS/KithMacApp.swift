@@ -54,7 +54,7 @@ struct MenuBarPanel: View {
                 }
             if model.busy { ProgressView().controlSize(.small) }
             if let last = model.items.last(where: { !$0.fromPerson }) {
-                Text(last.text).lineLimit(6).textSelection(.enabled)
+                Text(Format.markdown(last.text)).lineLimit(6).textSelection(.enabled)
                 if let turn = last.turn { TurnBadge(turn: turn, expanded: $expanded) }
                 if expanded, let turn = last.turn { ScrollView { TraceView(trace: turn.trace) }.frame(maxHeight: 260) }
             }

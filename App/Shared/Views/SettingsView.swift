@@ -114,14 +114,14 @@ struct ToolGrantRow: View {
     }
 
     var body: some View {
+        // Name on the left; scope and switch in fixed columns so every row lines up.
         HStack {
-            Toggle(isOn: Binding(get: { grant.enabled }, set: { v in var g = grant; g.enabled = v; set(g) })) {
-                VStack(alignment: .leading) {
-                    Text(spec.name).font(.body.monospaced())
-                    Text(spec.effect == .write ? "write · held for confirmation" : "read").font(.caption).foregroundStyle(.secondary)
-                }
+            VStack(alignment: .leading) {
+                Text(spec.name).font(.body.monospaced())
+                Text(spec.effect == .write ? "write · held for confirmation" : "read").font(.caption).foregroundStyle(.secondary)
             }
-            Picker("", selection: Binding(
+            Spacer()
+            Picker(spec.name, selection: Binding(
                 get: { grant.scope == .onDevice ? 1 : 0 },
                 set: { v in var g = grant; g.scope = v == 1 ? .onDevice : .everyone; set(g) }
             )) {
@@ -129,7 +129,10 @@ struct ToolGrantRow: View {
                 Text("This device only").tag(1)
             }
             .labelsHidden()
-            .frame(maxWidth: 170)
+            .fixedSize()
+            .frame(width: 170, alignment: .trailing)
+            Toggle(spec.name, isOn: Binding(get: { grant.enabled }, set: { v in var g = grant; g.enabled = v; set(g) }))
+                .labelsHidden()
         }
     }
 }

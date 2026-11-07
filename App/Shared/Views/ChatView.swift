@@ -76,7 +76,7 @@ struct MessageRow: View {
 
     var body: some View {
         VStack(alignment: item.fromPerson ? .trailing : .leading, spacing: 6) {
-            Text(item.text)
+            Text(item.fromPerson ? AttributedString(item.text) : Format.markdown(item.text))
                 .textSelection(.enabled)
                 .padding(10)
                 .background(item.fromPerson ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.12),

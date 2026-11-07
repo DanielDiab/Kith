@@ -81,8 +81,9 @@ public actor Agent {
 
     public func respond(to userText: String, client: Client = .app, history: [ChatMessage] = []) async -> AgentTurn {
         turnCounter += 1
-        let recorder = TraceRecorder(masker: masker, prices: prices, now: now)
-        let started = now()
+        // Spans are timed on the wall clock; `now` is the person's "today", frozen in the demo week.
+        let recorder = TraceRecorder(masker: masker, prices: prices)
+        let started = await recorder.time()
         let spanish = Language.isSpanish(userText)
 
         func finish(_ reply: String, _ outcome: AgentTurn.Outcome, gate: ToolGate?, unverified: [Claim] = []) async -> AgentTurn {
@@ -224,8 +225,8 @@ public actor Agent {
 
     /// Runs a held write after the person confirms it in the app.
     public func confirm(_ id: String) async throws -> ConfirmationResult {
-        let recorder = TraceRecorder(masker: masker, prices: prices, now: now)
-        let started = now()
+        let recorder = TraceRecorder(masker: masker, prices: prices)
+        let started = await recorder.time()
         let write = try await pending.take(id)
         guard let handler = registry.handler(named: write.tool) else { throw ToolError.notFound(write.tool) }
         let result = try await handler.call(write.arguments)

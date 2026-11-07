@@ -134,4 +134,10 @@ enum Format {
     static func ms(_ value: Double) -> String {
         value >= 1000 ? String(format: "%.1f s", value / 1000) : "\(Int(value.rounded())) ms"
     }
+
+    /// Models answer in Markdown; render bold, italics and code, and keep the line breaks.
+    static func markdown(_ text: String) -> AttributedString {
+        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        return (try? AttributedString(markdown: text, options: options)) ?? AttributedString(text)
+    }
 }
