@@ -13,19 +13,35 @@ struct KithMacApp: App {
         WindowGroup("Kith", id: "main") {
             ChatView()
                 .environment(model)
+                .tint(.kithMoss)
                 .navigationTitle("Kith")
                 .navigationSubtitle(model.settings.privacy.title)
                 .frame(minWidth: 480, minHeight: 520)
-                .task { await model.start() }
+                .containerBackground(Color.kithPaper, for: .window)
+                .toolbarBackground(Color.kithPaper, for: .windowToolbar)
+                .task {
+                    await model.start()
+                    #if DEBUG
+                        await DemoCapture.runIfRequested(model: model)
+                    #endif
+                }
         }
-        .defaultSize(width: 640, height: 760)
+        .defaultSize(width: 680, height: 800)
 
         MenuBarExtra {
             MenuBarPanel()
                 .environment(model)
                 .task { await model.start() }
         } label: {
-            Image(systemName: model.pending.isEmpty ? "bubble.left.and.text.bubble.right" : "bubble.left.and.exclamationmark.bubble.right")
+            // The mark as a template image; a count appears beside it when something waits for you.
+            if model.pending.isEmpty {
+                Image("MenuBarMark")
+            } else {
+                HStack(spacing: 3) {
+                    Image("MenuBarMark")
+                    Text("\(model.pending.count)")
+                }
+            }
         }
         .menuBarExtraStyle(.window)
 
@@ -46,6 +62,12 @@ struct MenuBarPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                KithMark(size: 22)
+                Text("Kith").font(.kithDisplay(15)).foregroundStyle(Color.kithInk)
+                Spacer()
+                Text(model.settings.privacy.title).font(.caption.weight(.medium)).foregroundStyle(Color.kithMuted)
+            }
             HStack(spacing: 8) {
                 TextField("Ask Kith", text: $draft)
                     .textFieldStyle(.roundedBorder)
@@ -87,5 +109,7 @@ struct MenuBarPanel: View {
         }
         .padding(14)
         .frame(width: 380)
+        .background(Color.kithPaper)
+        .tint(.kithMoss)
     }
 }

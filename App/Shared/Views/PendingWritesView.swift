@@ -30,9 +30,9 @@ struct PendingCard: View {
 
     private var action: (kind: String, symbol: String, confirm: String, tint: Color) {
         switch write.tool {
-        case "calendar_create_event": return ("New event", "calendar.badge.plus", "Add to Calendar", .red)
-        case "reminders_complete": return ("Complete reminder", "checklist.checked", "Mark as Done", .orange)
-        default: return ("Change", "square.and.pencil", "Confirm", .accentColor)
+        case "calendar_create_event": return ("New event", "calendar.badge.plus", "Add to Calendar", .kithMoss)
+        case "reminders_complete": return ("Complete reminder", "checklist.checked", "Mark as Done", .kithMoss)
+        default: return ("Change", "square.and.pencil", "Confirm", .kithMoss)
         }
     }
 
@@ -41,26 +41,28 @@ struct PendingCard: View {
             Image(systemName: action.symbol)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 36, height: 36)
-                .background(action.tint.gradient, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .frame(width: 38, height: 38)
+                .background(Color.kithAmber.gradient, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
 
             VStack(alignment: .leading, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
-                        Text("\(action.kind) · proposed by \(write.client.label)")
+                        Text("Waiting for your OK").foregroundStyle(Color.kithAmber).fontWeight(.semibold)
+                        Text("· \(action.kind) · proposed by \(write.client.label)")
                         Spacer(minLength: 8)
                         Text("Expires in \(write.expiresAt, style: .relative)")
                             .monospacedDigit()
                     }
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.kithMuted)
                     Text(parts.headline)
                         .font(.headline)
+                        .foregroundStyle(Color.kithInk)
                         .fixedSize(horizontal: false, vertical: true)
                     if let details = parts.details {
                         Text(details)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.kithMuted)
                     }
                 }
 
@@ -70,7 +72,7 @@ struct PendingCard: View {
                         systemImage: "exclamationmark.triangle.fill"
                     )
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Color.kithCoral)
                     .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -78,13 +80,13 @@ struct PendingCard: View {
                     Button {
                         run { await model.confirm(write) }
                     } label: {
-                        Text(action.confirm).frame(minWidth: 90)
+                        Label(action.confirm, systemImage: "checkmark")
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(KithProminentButtonStyle(tint: action.tint))
                     Button("Discard", role: .destructive) {
                         run { await model.reject(write) }
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(KithQuietButtonStyle())
                     if working { ProgressView().controlSize(.small) }
                 }
                 .controlSize(.regular)
@@ -92,10 +94,10 @@ struct PendingCard: View {
             }
         }
         .padding(14)
-        .background(.background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.kithSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(write.proposedAfterFlaggedData ? Color.orange.opacity(0.6) : Color.primary.opacity(0.1))
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(write.proposedAfterFlaggedData ? Color.kithCoral.opacity(0.6) : Color.kithAmber.opacity(0.45), lineWidth: 1.5)
         )
     }
 

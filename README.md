@@ -4,6 +4,17 @@ A native agent for Mac and iPhone over your own Apple data (Calendar, Reminders,
 
 *Kith* is the old word for the people you know: friends, neighbours, family. That's what the agent works on.
 
+<p align="center">
+  <img src="docs/screenshots/today.png" width="49%" alt="“¿Qué tengo hoy?” answered on the device in 7.3 s for $0, with 10 facts checked and the trace open">
+  <img src="docs/screenshots/poisoned.png" width="49%" alt="The same question with a poisoned invite planted: its title is withheld before any model sees it">
+</p>
+<p align="center">
+  <img src="docs/screenshots/held.png" width="49%" alt="Lunch with Mateo “a la 1”: the on-device model proposed 12:00, the gate refused it, Qwen on the Mac proposed 13:00, and the event waits for confirmation">
+  <img src="docs/screenshots/welcome.png" width="49%" alt="The welcome: what Kith promises, questions to start with, and where answers may run">
+</p>
+
+Real answers from the demo week, captured by the app itself (see `App/Shared/DemoCapture.swift`). The design system, palette and mark are in [docs/brand](docs/brand/BRAND.md).
+
 ## What's interesting here
 
 - **One gate for every path to your data.** The in-app agent (whichever model drives it), Siri through App Intents, and MCP clients all reach Calendar, Reminders and Contacts through one `ToolGate`. It checks the per-tool grant for that client, caps repeated calls, holds every write for your confirmation, refuses writes your own message didn't ask for, and passes every result through a data guard before any model sees it. MCP clients can propose a change; only you can confirm it, in the app.

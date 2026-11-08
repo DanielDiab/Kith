@@ -24,6 +24,8 @@ final class AppModel {
     var specs: [ToolSpec] = []
     var mcpActivity: [Trace] = []
     var busy = false
+    /// Opens every answer's details as it appears (set by the screenshot capture in debug builds).
+    var expandTraces = false
     var lastError: String?
     var claudeKeySet = (Keychain.read(KithRuntime.claudeKeyAccount) ?? "").isEmpty == false
 

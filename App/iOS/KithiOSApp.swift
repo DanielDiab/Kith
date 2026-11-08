@@ -27,7 +27,13 @@ struct KithiOSApp: App {
                 .tabItem { Label("Settings", systemImage: "gearshape") }
             }
             .environment(model)
-            .task { await model.start() }
+            .tint(.kithMoss)
+            .task {
+                await model.start()
+                #if DEBUG
+                    await DemoCapture.runIfRequested(model: model)
+                #endif
+            }
         }
     }
 }
@@ -44,6 +50,7 @@ struct PendingTab: View {
                 PendingWritesView().padding()
             }
         }
+        .background(Color.kithPaper)
         .refreshable { await model.refresh() }
     }
 }

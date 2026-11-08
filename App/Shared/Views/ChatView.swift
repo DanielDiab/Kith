@@ -10,7 +10,7 @@ struct ChatView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 22) {
+                LazyVStack(alignment: .leading, spacing: 26) {
                     if model.items.isEmpty {
                         WelcomeView { text in send(text) }
                     }
@@ -21,9 +21,9 @@ struct ChatView: View {
                         ThinkingRow().id("thinking")
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 18)
-                .frame(maxWidth: 760)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 22)
+                .frame(maxWidth: 780)
                 .frame(maxWidth: .infinity)
             }
             #if os(iOS)
@@ -38,24 +38,26 @@ struct ChatView: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 if !model.pending.isEmpty {
                     PendingWritesView()
-                        .frame(maxWidth: 760)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
+                        .frame(maxWidth: 780)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 12)
                         .frame(maxWidth: .infinity)
-                        .background(.bar)
+                        .background(Color.kithPaper)
+                        .overlay(alignment: .bottom) { Rectangle().fill(Color.kithLine).frame(height: 1) }
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 Composer(draft: $draft) { send(draft) }
-                    .frame(maxWidth: 760)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 12)
+                    .frame(maxWidth: 780)
+                    .padding(.horizontal, 18)
+                    .padding(.top, 10)
+                    .padding(.bottom, 20)
                     .frame(maxWidth: .infinity)
-                    .background(.bar)
+                    .background(Color.kithPaper)
             }
         }
+        .background(Color.kithPaper)
         .animation(.snappy, value: model.pending.count)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -80,86 +82,233 @@ struct ChatView: View {
 
 // MARK: - Welcome
 
+/// The home screen: who Kith is, what it promises, a few questions to start with, and where
+/// answers may run right now.
 struct WelcomeView: View {
     @Environment(AppModel.self) private var model
     let send: (String) -> Void
 
-    private let suggestions: [(symbol: String, text: String)] = [
-        ("calendar", "¿Qué tengo hoy?"),
-        ("checklist", "¿Qué recordatorios tengo pendientes?"),
-        ("calendar.badge.exclamationmark", "Organiza mi semana y dime si hay conflictos"),
-        ("calendar.badge.plus", "Agenda almuerzo con Mateo el viernes a la 1"),
+    private let suggestions: [(symbol: String, text: String, tint: Color)] = [
+        ("calendar", "¿Qué tengo hoy?", .kithMoss),
+        ("checklist", "¿Qué recordatorios tengo pendientes?", .kithAmber),
+        ("calendar.badge.exclamationmark", "Organiza mi semana y dime si hay conflictos", .kithDusk),
+        ("calendar.badge.plus", "Agenda almuerzo con Mateo el viernes a la 1", .kithClay),
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 8) {
-                Image(systemName: "bubble.left.and.text.bubble.right.fill")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 48, height: 48)
-                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .padding(.bottom, 6)
+        VStack(alignment: .leading, spacing: 30) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 12) {
+                    KithMark(size: 46)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Kith").font(.kithDisplay(17)).foregroundStyle(Color.kithInk)
+                        Text("Your calendar, reminders and contacts")
+                            .font(.footnote)
+                            .foregroundStyle(Color.kithMuted)
+                    }
+                }
                 Text("Ask about your week")
-                    .font(.largeTitle.weight(.bold))
+                    .font(.kithDisplay(36))
+                    .foregroundStyle(Color.kithInk)
+                    .padding(.top, 6)
                 Text("Kith reads your Calendar, Reminders and Contacts, checks every answer against them, and never changes anything without your OK.")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+                    .font(.title3)
+                    .foregroundStyle(Color.kithMuted)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 10)], spacing: 10) {
-                ForEach(suggestions, id: \.text) { s in
-                    SuggestionCard(symbol: s.symbol, text: s.text) { send(s.text) }
+            PromiseStrip()
+
+            VStack(alignment: .leading, spacing: 10) {
+                SectionLabel("Try asking")
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), spacing: 10)], spacing: 10) {
+                    ForEach(suggestions, id: \.text) { s in
+                        SuggestionCard(symbol: s.symbol, text: s.text, tint: s.tint) { send(s.text) }
+                    }
                 }
             }
 
-            Label {
-                Text(model.settings.privacy.explanation)
-            } icon: {
-                Image(systemName: model.settings.privacy.symbol)
+            VStack(alignment: .leading, spacing: 10) {
+                SectionLabel("Where answers may run")
+                WhereAnswersRun()
             }
-            .font(.footnote)
-            .foregroundStyle(.secondary)
         }
-        .padding(.top, 24)
+        .padding(.top, 18)
+    }
+}
+
+struct SectionLabel: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        Text(text.uppercased())
+            .font(.caption.weight(.semibold))
+            .tracking(0.8)
+            .foregroundStyle(Color.kithMuted)
+    }
+}
+
+/// The three promises behind every answer, each in the colour it has everywhere else.
+/// Side by side when there is room, stacked on a phone.
+struct PromiseStrip: View {
+    #if os(iOS)
+        @Environment(\.horizontalSizeClass) private var sizeClass
+    #endif
+    private let items: [(symbol: String, title: String, text: String, tint: Color)] = [
+        ("checkmark.shield.fill", "Checked", "Every time, name and figure must come from your data.", .kithLeaf),
+        ("hand.raised.fill", "Held", "Changes wait for your OK, whoever proposes them.", .kithAmber),
+        ("eye.slash.fill", "Guarded", "Text that tries to instruct the assistant is withheld.", .kithCoral),
+    ]
+
+    var body: some View {
+        #if os(iOS)
+            if sizeClass == .compact {
+                VStack(alignment: .leading, spacing: 8) { cells }
+            } else {
+                HStack(alignment: .top, spacing: 10) { cells }
+            }
+        #else
+            HStack(alignment: .top, spacing: 10) { cells }
+        #endif
+    }
+
+    private var cells: some View {
+        ForEach(items, id: \.title) { item in
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: item.symbol)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(item.tint)
+                    .frame(width: 30, height: 30)
+                    .background(item.tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.title).font(.callout.weight(.semibold)).foregroundStyle(Color.kithInk)
+                    Text(item.text)
+                        .font(.footnote)
+                        .foregroundStyle(Color.kithMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .kithCard(radius: 14, padding: 12)
+        }
     }
 }
 
 struct SuggestionCard: View {
     let symbol: String
     let text: String
+    var tint: Color = .kithMoss
     let action: () -> Void
     @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
+            HStack(spacing: 12) {
                 Image(systemName: symbol)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(Color.accentColor)
-                    .frame(width: 22)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 34, height: 34)
+                    .background(tint.opacity(0.13), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 Text(text)
-                    .font(.callout)
-                    .foregroundStyle(.primary)
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(Color.kithInk)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
+                Image(systemName: "arrow.up.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(hovering ? tint : Color.kithMuted.opacity(0.6))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 11)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.primary.opacity(hovering ? 0.08 : 0.045), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(Color.kithSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(hovering ? tint.opacity(0.55) : Color.kithLine)
+            )
+            .offset(y: hovering ? -1 : 0)
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .onHover { h in withAnimation(.snappy(duration: 0.2)) { hovering = h } }
+    }
+}
+
+/// The three places an answer can run, which ones the privacy mode allows, and whether each
+/// is ready. Choosing one sets the privacy mode that allows up to it.
+struct WhereAnswersRun: View {
+    @Environment(AppModel.self) private var model
+
+    private let order: [(tier: Tier, mode: PrivacyMode, note: String)] = [
+        (.onDevice, .deviceOnly, "Apple's model, never leaves this device"),
+        (.localOpen, .ownHardware, "An open model on your Mac"),
+        (.claude, .allowCloud, "Only if nothing local fits"),
+    ]
+
+    private func allowed(_ tier: Tier) -> Bool {
+        switch model.settings.privacy {
+        case .deviceOnly: return tier == .onDevice
+        case .ownHardware: return tier != .claude
+        case .allowCloud: return true
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(order.enumerated()), id: \.offset) { index, entry in
+                let profile = model.profile(entry.tier)
+                let on = allowed(entry.tier)
+                Button {
+                    Task { await model.setPrivacy(entry.mode) }
+                } label: {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            Image(systemName: entry.tier.symbol)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(on ? Color.white : Color.kithMuted)
+                                .frame(width: 28, height: 28)
+                                .background(on ? entry.tier.tint : Color.kithSunken, in: Circle())
+                            Text(entry.tier.label)
+                                .font(.callout.weight(.semibold))
+                                .foregroundStyle(on ? Color.kithInk : Color.kithMuted)
+                            Spacer(minLength: 0)
+                        }
+                        Text(entry.note)
+                            .font(.caption)
+                            .foregroundStyle(Color.kithMuted)
+                            .fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(!on ? Color.kithMuted.opacity(0.4) : (profile?.available ?? false) ? Color.kithLeaf : Color.kithAmber)
+                                .frame(width: 6, height: 6)
+                            Text(!on ? "Off" : (profile?.available ?? false) ? "Ready" : "Not set up")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(Color.kithMuted)
+                        }
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(entry.mode.explanation)
+                if index < order.count - 1 {
+                    Rectangle().fill(Color.kithLine).frame(width: 1).padding(.vertical, 10)
+                }
+            }
+        }
+        .background(Color.kithSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.kithLine))
     }
 }
 
 // MARK: - Messages
 
 struct MessageRow: View {
+    @Environment(AppModel.self) private var model
     let item: ChatItem
     @State private var showDetails: Bool
 
@@ -171,70 +320,81 @@ struct MessageRow: View {
     var body: some View {
         if item.fromPerson {
             HStack {
-                Spacer(minLength: 60)
+                Spacer(minLength: 80)
                 Text(item.text)
                     .textSelection(.enabled)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
+                    .padding(.horizontal, 15)
+                    .padding(.vertical, 10)
                     .foregroundStyle(.white)
-                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .background(Color.kithMoss, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             }
         } else if let symbol = item.notice {
             Label(item.text, systemImage: symbol)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .symbolRenderingMode(.hierarchical)
+                .font(.callout.weight(.medium))
+                .foregroundStyle(symbol.hasPrefix("checkmark") ? Color.kithLeaf : Color.kithMuted)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background((symbol.hasPrefix("checkmark") ? Color.kithLeaf : Color.kithMuted).opacity(0.1), in: Capsule())
         } else {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(Format.markdown(item.text))
-                    .textSelection(.enabled)
-                    .lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let turn = item.turn {
-                    AnswerFooter(turn: turn, expanded: $showDetails)
-                    if showDetails {
-                        TraceView(trace: turn.trace)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
+            HStack(alignment: .top, spacing: 12) {
+                KithMark(size: 28)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(Format.markdown(item.text))
+                        .foregroundStyle(Color.kithInk)
+                        .textSelection(.enabled)
+                        .lineSpacing(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let turn = item.turn {
+                        AnswerFooter(turn: turn, expanded: $showDetails)
+                        if showDetails {
+                            TraceView(trace: turn.trace)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
                     }
                 }
+                .padding(.top, 3)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .onAppear { if model.expandTraces { showDetails = true } }
         }
     }
 }
 
 struct ThinkingRow: View {
+    @State private var phase = false
+
     var body: some View {
-        HStack(spacing: 8) {
-            ProgressView().controlSize(.small)
-            Text("Thinking…").foregroundStyle(.secondary)
+        HStack(spacing: 12) {
+            KithMark(size: 28)
+                .scaleEffect(phase ? 1 : 0.92)
+                .opacity(phase ? 1 : 0.7)
+            Text("Thinking…")
+                .font(.callout.weight(.medium))
+                .foregroundStyle(Color.kithMuted)
         }
-        .font(.callout)
+        .onAppear { withAnimation(.easeInOut(duration: 0.8).repeatForever()) { phase = true } }
     }
 }
 
 // MARK: - Answer footer
 
 /// Under every answer: was it checked, where did it run, how long and what it cost.
-/// "Details" opens the full trace.
+/// "How this was answered" opens the full trace.
 struct AnswerFooter: View {
     let turn: AgentTurn
     @Binding var expanded: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) {
-                    statusChips
-                    Spacer(minLength: 8)
-                    detailsButton
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) { statusChips }
-                    detailsButton
-                }
+                HStack(spacing: 6) { statusChips }
+                VStack(alignment: .leading, spacing: 6) { statusChips }
             }
-            meta
+            HStack(spacing: 10) {
+                meta
+                Spacer(minLength: 8)
+                detailsButton
+            }
         }
     }
 
@@ -248,32 +408,37 @@ struct AnswerFooter: View {
         Button {
             withAnimation(.snappy) { expanded.toggle() }
         } label: {
-            HStack(spacing: 3) {
+            HStack(spacing: 4) {
                 Text(expanded ? "Hide details" : "How this was answered")
                 Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.bold))
                     .rotationEffect(.degrees(expanded ? 180 : 0))
             }
-            .font(.footnote.weight(.medium))
+            .font(.footnote.weight(.semibold))
         }
         .buttonStyle(.plain)
-        .foregroundStyle(Color.accentColor)
+        .foregroundStyle(Color.kithMoss)
     }
 
     private var meta: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 6) {
             if let tier = turn.tier {
-                Image(systemName: tier.symbol)
-                Text(tier.label)
+                HStack(spacing: 4) {
+                    Image(systemName: tier.symbol)
+                    Text(tier.label)
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tier.tint)
             } else {
-                Text("No model ran")
+                Text("No model ran").font(.caption.weight(.semibold)).foregroundStyle(Color.kithMuted)
             }
-            Text("·")
+            Text("·").foregroundStyle(Color.kithMuted)
             Text(Format.ms(turn.trace.latencyMs))
-            Text("·")
+            Text("·").foregroundStyle(Color.kithMuted)
             Text(Format.cost(turn.trace.costUSD))
         }
         .font(.caption.monospacedDigit())
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(Color.kithMuted)
     }
 }
 
@@ -287,24 +452,24 @@ struct TurnStatus: Equatable {
         var out: [TurnStatus] = []
         switch turn.outcome {
         case .blocked:
-            return [TurnStatus(symbol: "hand.raised.fill", text: "Blocked before any model ran", color: .red)]
+            return [TurnStatus(symbol: "hand.raised.fill", text: "Blocked before any model ran", color: .kithCoral)]
         case .failedSafe:
-            out.append(TurnStatus(symbol: "xmark.shield.fill", text: "Couldn't verify, so no answer", color: .red))
+            out.append(TurnStatus(symbol: "xmark.shield.fill", text: "Couldn't verify, so no answer", color: .kithCoral))
         case .answered, .awaitingConfirmation:
             let checked = turn.trace.spans.last(where: { $0.kind == .outputGuard && $0.status == .ok })?
                 .detail["claims_checked"].flatMap(Int.init) ?? 0
             if checked > 0 {
                 out.append(TurnStatus(symbol: "checkmark.shield.fill",
-                                      text: "Checked \(checked) \(checked == 1 ? "fact" : "facts") against your data", color: .green))
+                                      text: "Checked \(checked) \(checked == 1 ? "fact" : "facts") against your data", color: .kithLeaf))
             } else {
-                out.append(TurnStatus(symbol: "checkmark.shield", text: "Nothing to check", color: .secondary))
+                out.append(TurnStatus(symbol: "checkmark.shield", text: "Nothing to check", color: .kithMuted))
             }
         }
         if turn.outcome == .awaitingConfirmation {
-            out.append(TurnStatus(symbol: "hourglass", text: "Waiting for your OK", color: .orange))
+            out.append(TurnStatus(symbol: "hourglass", text: "Waiting for your OK", color: .kithAmber))
         }
         if turn.flaggedData {
-            out.append(TurnStatus(symbol: "exclamationmark.shield.fill", text: "Suspicious text withheld", color: .yellow))
+            out.append(TurnStatus(symbol: "eye.slash.fill", text: "Suspicious text withheld", color: .kithCoral))
         }
         return out
     }
@@ -315,11 +480,11 @@ struct StatusChip: View {
 
     var body: some View {
         Label(status.text, systemImage: status.symbol)
-            .font(.footnote.weight(.medium))
-            .foregroundStyle(status.color == .yellow ? Color.orange : status.color)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(status.color.opacity(0.13), in: Capsule())
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(status.color)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(status.color.opacity(0.12), in: Capsule())
             .lineLimit(1)
     }
 }
@@ -339,18 +504,19 @@ struct Composer: View {
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
             PrivacyMenu()
-            TextField("Ask Kith", text: $draft, axis: .vertical)
+            TextField("Ask Kith about your week", text: $draft, axis: .vertical)
                 .textFieldStyle(.plain)
+                .foregroundStyle(Color.kithInk)
                 .lineLimit(1...6)
                 .focused($focused)
                 .onSubmit { if canSend { send() } }
-                .padding(.vertical, 7)
+                .padding(.vertical, 8)
             Button(action: send) {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 28, height: 28)
-                    .background(canSend ? Color.accentColor : Color.secondary.opacity(0.35), in: Circle())
+                    .frame(width: 32, height: 32)
+                    .background(canSend ? Color.kithMoss : Color.kithMuted.opacity(0.3), in: Circle())
             }
             .buttonStyle(.plain)
             .disabled(!canSend)
@@ -358,16 +524,14 @@ struct Composer: View {
             .accessibilityLabel("Send")
         }
         .padding(.leading, 6)
-        .padding(.trailing, 5)
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 19, style: .continuous)
-                .fill(Color.primary.opacity(0.045))
-        )
+        .padding(.trailing, 6)
+        .padding(.vertical, 5)
+        .background(Color.kithSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 19, style: .continuous)
-                .strokeBorder(Color.primary.opacity(focused ? 0.22 : 0.12))
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(focused ? Color.kithMoss.opacity(0.6) : Color.kithLine, lineWidth: focused ? 1.5 : 1)
         )
+        .shadow(color: Color.black.opacity(0.05), radius: 10, y: 3)
     }
 }
 
@@ -388,10 +552,11 @@ struct PrivacyMenu: View {
             .pickerStyle(.inline)
         } label: {
             Image(systemName: model.settings.privacy.symbol)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 28, height: 28)
-                .contentShape(Rectangle())
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.kithMoss)
+                .frame(width: 32, height: 32)
+                .background(Color.kithMoss.opacity(0.1), in: Circle())
+                .contentShape(Circle())
         }
         .menuStyle(.button)
         .buttonStyle(.plain)

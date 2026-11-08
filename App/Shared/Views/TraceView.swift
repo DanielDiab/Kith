@@ -16,34 +16,40 @@ struct TraceView: View {
                 }
             }
         }
-        .padding(14)
-        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.primary.opacity(0.07)))
+        .padding(16)
+        .background(Color.kithSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.kithLine))
     }
 
     private var summary: some View {
         HStack(spacing: 0) {
-            Stat(title: "Ran on", value: trace.tier?.label ?? "No model")
-            Divider().frame(height: 28)
+            Stat(title: "Ran on", value: trace.tier?.label ?? "No model", tint: trace.tier?.tint)
+            divider
             Stat(title: "Tokens", value: trace.usage.total.formatted() + (trace.usage.estimated ? "*" : ""))
-            Divider().frame(height: 28)
+            divider
             Stat(title: "Cost", value: Format.cost(trace.costUSD))
-            Divider().frame(height: 28)
+            divider
             Stat(title: "On Claude", value: Format.cost(trace.referenceCostUSD))
-            Divider().frame(height: 28)
+            divider
             Stat(title: "Time", value: Format.ms(trace.latencyMs))
         }
+        .padding(.vertical, 10)
+        .background(Color.kithSunken.opacity(0.6), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
+
+    private var divider: some View { Rectangle().fill(Color.kithLine).frame(width: 1, height: 28) }
 }
 
 private struct Stat: View {
     let title: String
     let value: String
+    var tint: Color? = nil
 
     var body: some View {
-        VStack(spacing: 2) {
-            Text(title).font(.caption2).foregroundStyle(.secondary)
-            Text(value).font(.callout.weight(.semibold).monospacedDigit()).lineLimit(1).minimumScaleFactor(0.7)
+        VStack(spacing: 3) {
+            Text(title.uppercased()).font(.caption2.weight(.semibold)).tracking(0.5).foregroundStyle(Color.kithMuted)
+            Text(value).font(.callout.weight(.semibold).monospacedDigit()).foregroundStyle(tint ?? Color.kithInk)
+                .lineLimit(1).minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity)
     }
@@ -58,27 +64,30 @@ struct SpanRow: View {
             Image(systemName: icon)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 22, height: 22)
+                .frame(width: 24, height: 24)
                 .background(tint, in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(title).font(.callout.weight(.semibold))
+                    Text(title).font(.callout.weight(.semibold)).foregroundStyle(Color.kithInk)
                     Spacer(minLength: 8)
                     if let usage = span.usage {
-                        Text("\(usage.total.formatted()) tok").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                        Text("\(usage.total.formatted()) tok").font(.caption.monospacedDigit()).foregroundStyle(Color.kithMuted)
                     }
-                    Text(Format.ms(span.durationMs)).font(.caption.monospacedDigit()).foregroundStyle(.tertiary)
+                    Text(Format.ms(span.durationMs)).font(.caption.monospacedDigit()).foregroundStyle(Color.kithMuted.opacity(0.8))
                 }
                 if let subtitle {
                     Text(subtitle)
                         .font(.footnote)
-                        .foregroundStyle(span.status == .ok ? Color.secondary : tint)
+                        .foregroundStyle(span.status == .ok ? Color.kithMuted : tint)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 ForEach(technical, id: \.self) { line in
                     Text(line)
                         .font(.caption.monospaced())
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Color.kithMuted.opacity(0.85))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.kithSunken.opacity(0.7), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
                         .lineLimit(2)
                         .textSelection(.enabled)
                 }
@@ -89,11 +98,11 @@ struct SpanRow: View {
         .background(alignment: .topLeading) {
             if !isLast {
                 Rectangle()
-                    .fill(Color.primary.opacity(0.12))
+                    .fill(Color.kithLine)
                     .frame(width: 2)
-                    .padding(.top, 24)
+                    .padding(.top, 26)
                     .padding(.bottom, 2)
-                    .padding(.leading, 10)
+                    .padding(.leading, 11)
             }
         }
     }
@@ -191,15 +200,15 @@ struct SpanRow: View {
         switch span.status {
         case .ok:
             switch span.kind {
-            case .inputGuard, .outputGuard, .confirmation: return .green
-            case .route: return .indigo
-            case .model: return .blue
-            case .tool: return .teal
-            case .dataGuard: return .yellow
+            case .inputGuard, .outputGuard, .confirmation: return .kithLeaf
+            case .route: return span.tier?.tint ?? .kithMoss
+            case .model: return span.tier?.tint ?? .kithMoss
+            case .tool: return .kithMoss
+            case .dataGuard: return .kithCoral
             }
-        case .held, .retried, .escalated: return .orange
-        case .flagged: return .orange
-        case .blocked, .denied, .failed: return .red
+        case .held, .retried, .escalated: return .kithAmber
+        case .flagged: return .kithCoral
+        case .blocked, .denied, .failed: return .kithCoral
         }
     }
 
