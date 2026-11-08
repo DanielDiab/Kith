@@ -47,8 +47,15 @@
             // real-model evals are repeatable. The tool-calling mode is left at its default:
             // `.required` applies to every step of the session's loop, not just the first, so the
             // model never stops calling tools.
+            // The 27 SDKs renamed the label to `samplingMode:` (the old one is deprecated there);
+            // the 26 SDKs only know `sampling:`.
+            #if compiler(>=6.4)  // Xcode 27
+                let options = GenerationOptions(samplingMode: .greedy)
+            #else
+                let options = GenerationOptions(sampling: .greedy)
+            #endif
             do {
-                let response = try await session.respond(to: prompt, options: GenerationOptions(samplingMode: .greedy))
+                let response = try await session.respond(to: prompt, options: options)
                 return ModelReply(text: response.content, usage: Self.usage(response, input: request.instructions + prompt))
             } catch let error as LanguageModelSession.GenerationError {
                 if case .exceededContextWindowSize = error { throw BackendError.contextExceeded }
